@@ -194,7 +194,8 @@ function MapContent({
       setIsDirectionMode(false);
       setDirectionTargetId(ft.id);
       getDirections({ lat: ft.lat!, lng: ft.lng! }, ft.name ?? ft.content ?? "destination");
-    } else {
+    } else if (!labelMode) {
+      // Attribute selection is disabled while a label mode is active
       onSelectId(ft.id === selectedId ? null : ft.id);
     }
   }
