@@ -106,6 +106,28 @@ function MapContent({
     return { url: `data:image/svg+xml,${DIRECTION_DOT_SVG}`, anchor: new google.maps.Point(13, 13), scaledSize: new google.maps.Size(26, 26) };
   }, [apiLoaded]);
 
+  // ── Label icon builder (needs API loaded) ────────────────────────────────
+  function makeLabelIcon(
+    text: string,
+    fill = "#22c55e",
+    stroke = "#15803d"
+  ): google.maps.Icon {
+    const w = Math.max(56, text.length * 7 + 16);
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="40">` +
+      `<circle cx="${w / 2}" cy="10" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>` +
+      `<rect x="1" y="24" width="${w - 2}" height="15" rx="4" fill="#1e1e2e"/>` +
+      `<text x="${w / 2}" y="34" text-anchor="middle" font-family="Arial,sans-serif" ` +
+      `font-size="10" fill="#fff" font-weight="bold">${text}</text>` +
+      `</svg>`
+    );
+    return {
+      url: `data:image/svg+xml,${svg}`,
+      anchor: new google.maps.Point(w / 2, 10),
+      scaledSize: new google.maps.Size(w, 40),
+    };
+  }
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [userLocation, setUserLocation]       = useState<{ lat: number; lng: number } | null>(null);
   const [showUserBalloon, setShowUserBalloon] = useState(false);
@@ -114,6 +136,9 @@ function MapContent({
   const [directionTargetId, setDirectionTargetId] = useState<string | null>(null);
   const [hasRoute, setHasRoute]               = useState(false);
   const [routeInfo, setRouteInfo]             = useState<string | null>(null);
+  type LabelMode = null | "pressure" | "flow";
+  const [labelMode, setLabelMode]             = useState<LabelMode>(null);
+  const [showLabelMenu, setShowLabelMenu]     = useState(false);
 
   // Directions renderer lives outside React render cycle
   const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
@@ -152,6 +177,7 @@ function MapContent({
 
   // ── Map click ─────────────────────────────────────────────────────────────
   function handleMapClick(e: MapMouseEvent) {
+    setShowLabelMenu(false);
     if (isPlacingPoint) {
       const ll = e.detail.latLng;
       if (ll) onPointPlaced(ll.lat, ll.lng);
@@ -262,6 +288,42 @@ function MapContent({
           >
             {hasRoute ? "🗺 Clear Route" : "🧭 Direction"}
           </button>
+
+          {/* ── Label button + dropdown ── */}
+          <div style={{ position: "relative" }}>
+            <button
+              className={`label-btn ${labelMode ? "label-btn--active" : ""}`}
+              onClick={() => setShowLabelMenu((v) => !v)}
+              title="Show labels on map"
+            >
+              🏷 Label{labelMode ? `: ${labelMode === "pressure" ? "Pressure" : "Flow"}` : ""}
+            </button>
+
+            {showLabelMenu && (
+              <div className="label-menu">
+                <button
+                  className={`label-menu-item ${labelMode === "pressure" ? "label-menu-item--active" : ""}`}
+                  onClick={() => { setLabelMode(labelMode === "pressure" ? null : "pressure"); setShowLabelMenu(false); }}
+                >
+                  💧 Pressure (psi)
+                </button>
+                <button
+                  className={`label-menu-item ${labelMode === "flow" ? "label-menu-item--active" : ""}`}
+                  onClick={() => { setLabelMode(labelMode === "flow" ? null : "flow"); setShowLabelMenu(false); }}
+                >
+                  🌊 Flow (gpm)
+                </button>
+                {labelMode && (
+                  <button
+                    className="label-menu-item label-menu-item--clear"
+                    onClick={() => { setLabelMode(null); setShowLabelMenu(false); }}
+                  >
+                    ✕ Clear Labels
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -299,19 +361,35 @@ function MapContent({
         styles={MAP_STYLES}
       >
         {/* ── FireTest markers ── */}
-        {mappablePoints.map((ft) => (
-          <Marker
-            key={ft.id}
-            position={{ lat: ft.lat!, lng: ft.lng! }}
-            icon={
-              ft.id === directionTargetId ? directionDotIcon :
-              ft.id === selectedId        ? selectedDotIcon  :
-                                            greenDotIcon
-            }
-            zIndex={ft.id === selectedId || ft.id === directionTargetId ? 10 : 1}
-            onClick={() => handleMarkerClick(ft)}
-          />
-        ))}
+        {mappablePoints.map((ft) => {
+          // Determine label text for this point
+          const labelText =
+            labelMode === "pressure" && ft.pressure != null ? `${ft.pressure} psi` :
+            labelMode === "flow"     && ft.flow     != null ? `${ft.flow} gpm`      :
+            null;
+
+          // Pick icon: direction target → amber, selected → white-ring, labeled → label SVG, default → green dot
+          const icon: google.maps.Icon | undefined =
+            !apiLoaded ? undefined :
+            ft.id === directionTargetId ? (
+              labelText ? makeLabelIcon(labelText, "#f59e0b", "#b45309") : directionDotIcon
+            ) :
+            ft.id === selectedId ? (
+              labelText ? makeLabelIcon(labelText, "#22c55e", "#15803d") : selectedDotIcon
+            ) :
+            labelText ? makeLabelIcon(labelText) :
+            greenDotIcon;
+
+          return (
+            <Marker
+              key={ft.id}
+              position={{ lat: ft.lat!, lng: ft.lng! }}
+              icon={icon}
+              zIndex={ft.id === selectedId || ft.id === directionTargetId ? 10 : 1}
+              onClick={() => handleMarkerClick(ft)}
+            />
+          );
+        })}
 
         {/* ── User location marker ── */}
         {userLocation && (
