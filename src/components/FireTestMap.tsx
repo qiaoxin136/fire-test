@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   APIProvider,
   Map,
@@ -7,31 +7,39 @@ import {
   Pin,
   useMap,
 } from "@vis.gl/react-google-maps";
+import type { MapMouseEvent } from "@vis.gl/react-google-maps";
 import type { Schema } from "../../amplify/data/resource";
 
 type FireTest = Schema["FireTest"]["type"];
 
 interface FireTestMapProps {
   fireTests: FireTest[];
+  isPlacingPoint: boolean;
+  onPointPlaced: (lat: number, lng: number) => void;
+  onCancelPlacing: () => void;
 }
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
-// Default center: Raleigh, NC
 const DEFAULT_CENTER = { lat: 35.7796, lng: -78.6382 };
 const DEFAULT_ZOOM = 15;
 
-// ── Outer wrapper (provides APIProvider) ──────────────────────────────────────
-export default function FireTestMap({ fireTests }: FireTestMapProps) {
+// ── Outer wrapper ─────────────────────────────────────────────────────────────
+export default function FireTestMap(props: FireTestMapProps) {
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-      <MapContent fireTests={fireTests} />
+      <MapContent {...props} />
     </APIProvider>
   );
 }
 
-// ── Inner component (has access to useMap) ────────────────────────────────────
-function MapContent({ fireTests }: FireTestMapProps) {
+// ── Inner component (uses useMap hook) ────────────────────────────────────────
+function MapContent({
+  fireTests,
+  isPlacingPoint,
+  onPointPlaced,
+  onCancelPlacing,
+}: FireTestMapProps) {
   const map = useMap();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,12 +47,32 @@ function MapContent({ fireTests }: FireTestMapProps) {
   const [showUserBalloon, setShowUserBalloon] = useState(false);
   const [locating, setLocating] = useState(false);
 
+  // Cancel placing mode with Escape key
+  useEffect(() => {
+    if (!isPlacingPoint) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancelPlacing();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPlacingPoint, onCancelPlacing]);
+
   const mappablePoints = fireTests.filter(
     (ft) => ft.lat != null && ft.lng != null
   );
   const selectedPoint = mappablePoints.find((ft) => ft.id === selectedId);
 
-  // ── Locate button handler ──────────────────────────────────────────────────
+  // ── Map click ────────────────────────────────────────────────────────────────
+  function handleMapClick(e: MapMouseEvent) {
+    if (isPlacingPoint) {
+      const latLng = e.detail.latLng;
+      if (latLng) onPointPlaced(latLng.lat, latLng.lng);
+    } else {
+      setSelectedId(null);
+    }
+  }
+
+  // ── Locate ───────────────────────────────────────────────────────────────────
   function handleLocate() {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
@@ -68,16 +96,31 @@ function MapContent({ fireTests }: FireTestMapProps) {
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div
+      style={{ position: "relative", width: "100%", height: "100%" }}
+      className={isPlacingPoint ? "map-placing" : ""}
+    >
       {/* ── Locate button ── */}
-      <button
-        className="locate-btn"
-        onClick={handleLocate}
-        disabled={locating}
-        title="Zoom to my location"
-      >
-        {locating ? "Locating…" : "📍 Locate"}
-      </button>
+      {!isPlacingPoint && (
+        <button
+          className="locate-btn"
+          onClick={handleLocate}
+          disabled={locating}
+          title="Zoom to my location"
+        >
+          {locating ? "Locating…" : "📍 Locate"}
+        </button>
+      )}
+
+      {/* ── Placing mode banner ── */}
+      {isPlacingPoint && (
+        <div className="placing-banner">
+          📌 Click anywhere on the map to place a point
+          <button className="placing-cancel" onClick={onCancelPlacing}>
+            ✕ Cancel
+          </button>
+        </div>
+      )}
 
       <Map
         style={{ width: "100%", height: "100%" }}
@@ -86,14 +129,14 @@ function MapContent({ fireTests }: FireTestMapProps) {
         mapId="firetest-map"
         gestureHandling="greedy"
         disableDefaultUI={false}
-        onClick={() => setSelectedId(null)}
+        onClick={handleMapClick}
       >
         {/* ── FireTest markers ── */}
         {mappablePoints.map((ft) => (
           <AdvancedMarker
             key={ft.id}
             position={{ lat: ft.lat!, lng: ft.lng! }}
-            onClick={() => setSelectedId(ft.id)}
+            onClick={() => !isPlacingPoint && setSelectedId(ft.id)}
           >
             <Pin background="#e53935" borderColor="#b71c1c" glyphColor="#ffffff" />
           </AdvancedMarker>

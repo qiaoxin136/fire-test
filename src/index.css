@@ -164,3 +164,57 @@ html, body, #root {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ── Placing mode ───────────────────────────────────── */
+
+/* Crosshair cursor over the entire map area */
+.map-placing,
+.map-placing :global(.gm-style),
+.map-placing div[style] {
+  cursor: crosshair !important;
+}
+
+/* Top banner shown while placing */
+.placing-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: #1e1e2e;
+  color: #fff;
+  border: 2px solid #1a73e8;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.placing-cancel {
+  pointer-events: all;
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.placing-cancel:hover {
+  background: #b71c1c;
+}
+
+/* "Add Point" button active state while placing */
+.btn-add--active {
+  background: #ffcdd2 !important;
+  color: #b71c1c !important;
+  cursor: not-allowed !important;
+}

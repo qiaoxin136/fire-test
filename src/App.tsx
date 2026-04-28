@@ -8,6 +8,7 @@ const client = generateClient<Schema>();
 
 function App() {
   const [fireTests, setFireTests] = useState<Array<Schema["FireTest"]["type"]>>([]);
+  const [isPlacingPoint, setIsPlacingPoint] = useState(false);
 
   useEffect(() => {
     const sub = client.models.FireTest.observeQuery().subscribe({
@@ -16,11 +17,50 @@ function App() {
     return () => sub.unsubscribe();
   }, []);
 
+  // Step 1 — panel button clicked: enter "click to place" mode
+  function handleStartPlacing() {
+    setIsPlacingPoint(true);
+  }
+
+  // Step 2 — user clicked on the map: capture lat/lng, prompt for the rest
+  async function handlePointPlaced(lat: number, lng: number) {
+    setIsPlacingPoint(false);
+
+    const name = window.prompt("Name:");
+    if (!name) return;
+
+    const content = window.prompt("Description (optional):");
+    const pressureStr = window.prompt("Pressure (psi):");
+    const flowStr = window.prompt("Flow (gpm):");
+
+    await client.models.FireTest.create({
+      name,
+      content: content || undefined,
+      lat,
+      lng,
+      pressure: pressureStr ? parseFloat(pressureStr) : undefined,
+      flow: flowStr ? parseFloat(flowStr) : undefined,
+    });
+  }
+
+  function handleCancelPlacing() {
+    setIsPlacingPoint(false);
+  }
+
   return (
     <div className="app-layout">
-      <FireTestPanel fireTests={fireTests} />
+      <FireTestPanel
+        fireTests={fireTests}
+        isPlacingPoint={isPlacingPoint}
+        onStartPlacing={handleStartPlacing}
+      />
       <div className="map-container">
-        <FireTestMap fireTests={fireTests} />
+        <FireTestMap
+          fireTests={fireTests}
+          isPlacingPoint={isPlacingPoint}
+          onPointPlaced={handlePointPlaced}
+          onCancelPlacing={handleCancelPlacing}
+        />
       </div>
     </div>
   );

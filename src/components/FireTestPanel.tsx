@@ -7,29 +7,15 @@ const client = generateClient<Schema>();
 
 interface FireTestPanelProps {
   fireTests: FireTest[];
+  isPlacingPoint: boolean;
+  onStartPlacing: () => void;
 }
 
-export default function FireTestPanel({ fireTests }: FireTestPanelProps) {
-  async function handleCreate() {
-    const name = window.prompt("Name:");
-    if (!name) return;
-
-    const content = window.prompt("Label / description:");
-    const latStr = window.prompt("Latitude (e.g. 35.7796):");
-    const lngStr = window.prompt("Longitude (e.g. -78.6382):");
-    const pressureStr = window.prompt("Pressure (psi):");
-    const flowStr = window.prompt("Flow (gpm):");
-
-    await client.models.FireTest.create({
-      name,
-      content: content ?? undefined,
-      lat: latStr ? parseFloat(latStr) : undefined,
-      lng: lngStr ? parseFloat(lngStr) : undefined,
-      pressure: pressureStr ? parseFloat(pressureStr) : undefined,
-      flow: flowStr ? parseFloat(flowStr) : undefined,
-    });
-  }
-
+export default function FireTestPanel({
+  fireTests,
+  isPlacingPoint,
+  onStartPlacing,
+}: FireTestPanelProps) {
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this point?")) return;
     await client.models.FireTest.delete({ id });
@@ -39,8 +25,13 @@ export default function FireTestPanel({ fireTests }: FireTestPanelProps) {
     <aside className="panel">
       <div className="panel-header">
         <h2>🔥 Fire Tests</h2>
-        <button className="btn-add" onClick={handleCreate}>
-          + Add Point
+        <button
+          className={`btn-add ${isPlacingPoint ? "btn-add--active" : ""}`}
+          onClick={onStartPlacing}
+          disabled={isPlacingPoint}
+          title="Click the map to place a point"
+        >
+          {isPlacingPoint ? "📌 Click map…" : "+ Add Point"}
         </button>
       </div>
 
