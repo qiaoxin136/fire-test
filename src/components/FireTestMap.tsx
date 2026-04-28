@@ -22,28 +22,22 @@ interface FireTestMapProps {
 }
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
-
 const DEFAULT_CENTER = { lat: 35.7796, lng: -78.6382 };
-const DEFAULT_ZOOM = 15;
+const DEFAULT_ZOOM   = 15;
 
 const GREEN_DOT_SVG = encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">' +
-  '<circle cx="10" cy="10" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/>' +
-  '</svg>'
+  '<circle cx="10" cy="10" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/></svg>'
 );
-
 const BLUE_DOT_SVG = encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
   '<circle cx="11" cy="11" r="9" fill="#1a73e8" stroke="#0d47a1" stroke-width="2.5"/>' +
-  '<circle cx="11" cy="11" r="3" fill="#fff"/>' +
-  '</svg>'
+  '<circle cx="11" cy="11" r="3" fill="#fff"/></svg>'
 );
-
 const DIRECTION_DOT_SVG = encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">' +
   '<circle cx="13" cy="13" r="11" fill="#f59e0b" stroke="#b45309" stroke-width="2.5"/>' +
-  '<circle cx="13" cy="13" r="4" fill="#fff"/>' +
-  '</svg>'
+  '<circle cx="13" cy="13" r="4" fill="#fff"/></svg>'
 );
 
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
@@ -66,20 +60,36 @@ export default function FireTestMap(props: FireTestMapProps) {
 
 // ── Inner component ───────────────────────────────────────────────────────────
 function MapContent({
-  fireTests,
-  isPlacingPoint,
-  onPointPlaced,
-  onCancelPlacing,
-  selectedId,
-  onSelectId,
+  fireTests, isPlacingPoint, onPointPlaced, onCancelPlacing, selectedId, onSelectId,
 }: FireTestMapProps) {
-  const map = useMap();
+  const map       = useMap();
   const apiLoaded = useApiIsLoaded();
 
-  // ── Icons (built after API loads) ─────────────────────────────────────────
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const svPanoRef   = useRef<google.maps.StreetViewPanorama | null>(null);
+  const svDivRef    = useRef<HTMLDivElement>(null);
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  const [userLocation,      setUserLocation]      = useState<{ lat: number; lng: number } | null>(null);
+  const [showUserBalloon,   setShowUserBalloon]   = useState(false);
+  const [locating,          setLocating]          = useState(false);
+  const [isDirectionMode,   setIsDirectionMode]   = useState(false);
+  const [directionTargetId, setDirectionTargetId] = useState<string | null>(null);
+  const [hasRoute,          setHasRoute]          = useState(false);
+  const [routeInfo,         setRouteInfo]         = useState<string | null>(null);
+  type LabelMode = null | "pressure" | "flow";
+  const [labelMode,         setLabelMode]         = useState<LabelMode>(null);
+  const [showLabelMenu,     setShowLabelMenu]     = useState(false);
+  // Street View state
+  const [showSV,   setShowSV]   = useState(false);
+  const [svPos,    setSvPos]    = useState<{ lat: number; lng: number } | null>(null);
+  const [svHeading,setSvHeading]= useState(0);
+
+  // ── Icons ─────────────────────────────────────────────────────────────────
   const greenDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
-    return { url: `data:image/svg+xml,${GREEN_DOT_SVG}`, anchor: new google.maps.Point(10, 10), scaledSize: new google.maps.Size(20, 20) };
+    return { url: `data:image/svg+xml,${GREEN_DOT_SVG}`, anchor: new google.maps.Point(10,10), scaledSize: new google.maps.Size(20,20) };
   }, [apiLoaded]);
 
   const selectedDotIcon = useMemo((): google.maps.Icon | undefined => {
@@ -88,17 +98,20 @@ function MapContent({
       url: `data:image/svg+xml,${encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">' +
         '<circle cx="14" cy="14" r="12" fill="white" stroke="#15803d" stroke-width="2"/>' +
-        '<circle cx="14" cy="14" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2"/>' +
-        '</svg>'
+        '<circle cx="14" cy="14" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2"/></svg>'
       )}`,
-      anchor: new google.maps.Point(14, 14),
-      scaledSize: new google.maps.Size(28, 28),
+      anchor: new google.maps.Point(14,14), scaledSize: new google.maps.Size(28,28),
     };
   }, [apiLoaded]);
 
   const blueDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
-    return { url: `data:image/svg+xml,${BLUE_DOT_SVG}`, anchor: new google.maps.Point(11, 11), scaledSize: new google.maps.Size(22, 22) };
+    return { url: `data:image/svg+xml,${BLUE_DOT_SVG}`, anchor: new google.maps.Point(11,11), scaledSize: new google.maps.Size(22,22) };
+  }, [apiLoaded]);
+
+  const directionDotIcon = useMemo((): google.maps.Icon | undefined => {
+    if (!apiLoaded) return undefined;
+    return { url: `data:image/svg+xml,${DIRECTION_DOT_SVG}`, anchor: new google.maps.Point(13,13), scaledSize: new google.maps.Size(26,26) };
   }, [apiLoaded]);
 
   const streetViewControlOptions = useMemo(() => {
@@ -106,71 +119,99 @@ function MapContent({
     return { position: google.maps.ControlPosition.LEFT_BOTTOM };
   }, [apiLoaded]);
 
-  const directionDotIcon = useMemo((): google.maps.Icon | undefined => {
-    if (!apiLoaded) return undefined;
-    return { url: `data:image/svg+xml,${DIRECTION_DOT_SVG}`, anchor: new google.maps.Point(13, 13), scaledSize: new google.maps.Size(26, 26) };
-  }, [apiLoaded]);
-
-  // ── Label icon builder (needs API loaded) ────────────────────────────────
-  function makeLabelIcon(
-    text: string,
-    fill = "#22c55e",
-    stroke = "#15803d"
-  ): google.maps.Icon {
-    const w = Math.max(70, text.length * 10 + 16);
+  // Walking man + purple direction cone (rotates with heading)
+  function makeSvMarkerIcon(heading: number): google.maps.Icon {
     const svg = encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="46">` +
-      `<circle cx="${w / 2}" cy="10" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>` +
-      `<text x="${w / 2}" y="40" text-anchor="middle" font-family="Arial,sans-serif" ` +
-      `font-size="16" fill="#a855f7" font-weight="bold">${text}</text>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52">` +
+      // Purple direction cone, rotated by heading
+      `<g transform="rotate(${heading}, 26, 26)">` +
+      `<polygon points="26,3 16,23 36,23" fill="#a855f7" stroke="#7c3aed" stroke-width="1.5" opacity="0.95"/>` +
+      `</g>` +
+      // Person – dark circle background
+      `<circle cx="26" cy="32" r="10" fill="#1e293b" stroke="#fff" stroke-width="2"/>` +
+      // Head
+      `<circle cx="26" cy="28" r="3.5" fill="#fff"/>` +
+      // Body
+      `<line x1="26" y1="31.5" x2="26" y2="38" stroke="#fff" stroke-width="2"/>` +
+      // Arms
+      `<line x1="21" y1="34" x2="31" y2="34" stroke="#fff" stroke-width="2"/>` +
+      // Legs
+      `<line x1="26" y1="38" x2="22" y2="43" stroke="#fff" stroke-width="2"/>` +
+      `<line x1="26" y1="38" x2="30" y2="43" stroke="#fff" stroke-width="2"/>` +
       `</svg>`
     );
     return {
       url: `data:image/svg+xml,${svg}`,
-      anchor: new google.maps.Point(w / 2, 10),
-      scaledSize: new google.maps.Size(w, 46),
+      anchor: new google.maps.Point(26, 32),
+      scaledSize: new google.maps.Size(52, 52),
     };
   }
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  const [userLocation, setUserLocation]       = useState<{ lat: number; lng: number } | null>(null);
-  const [showUserBalloon, setShowUserBalloon] = useState(false);
-  const [locating, setLocating]               = useState(false);
-  const [isDirectionMode, setIsDirectionMode] = useState(false);
-  const [directionTargetId, setDirectionTargetId] = useState<string | null>(null);
-  const [hasRoute, setHasRoute]               = useState(false);
-  const [routeInfo, setRouteInfo]             = useState<string | null>(null);
-  type LabelMode = null | "pressure" | "flow";
-  const [labelMode, setLabelMode]             = useState<LabelMode>(null);
-  const [showLabelMenu, setShowLabelMenu]     = useState(false);
+  // Label icon builder
+  function makeLabelIcon(text: string, fill = "#22c55e", stroke = "#15803d"): google.maps.Icon {
+    const w = Math.max(70, text.length * 10 + 16);
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="46">` +
+      `<circle cx="${w/2}" cy="10" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>` +
+      `<text x="${w/2}" y="40" text-anchor="middle" font-family="Arial,sans-serif" ` +
+      `font-size="16" fill="#a855f7" font-weight="bold">${text}</text></svg>`
+    );
+    return { url: `data:image/svg+xml,${svg}`, anchor: new google.maps.Point(w/2,10), scaledSize: new google.maps.Size(w,46) };
+  }
 
-  // Directions renderer lives outside React render cycle
-  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-
-  // ── Init DirectionsRenderer when map is ready ────────────────────────────
+  // ── Init DirectionsRenderer ───────────────────────────────────────────────
   useEffect(() => {
     if (!map || !apiLoaded) return;
     const renderer = new google.maps.DirectionsRenderer({
       map,
       suppressMarkers: false,
-      polylineOptions: {
-        strokeColor: "#1a73e8",
-        strokeWeight: 5,
-        strokeOpacity: 0.85,
-      },
+      polylineOptions: { strokeColor: "#1a73e8", strokeWeight: 5, strokeOpacity: 0.85 },
     });
     rendererRef.current = renderer;
+    return () => { renderer.setMap(null); rendererRef.current = null; };
+  }, [map, apiLoaded]);
+
+  // ── Init StreetViewPanorama linked to map's pegman ────────────────────────
+  useEffect(() => {
+    if (!map || !apiLoaded || !svDivRef.current) return;
+
+    const pano = new google.maps.StreetViewPanorama(svDivRef.current, {
+      visible: false,
+      addressControl: true,
+      fullscreenControl: false,
+      motionTracking: false,
+    });
+
+    // Link panorama to the map so the pegman controls it
+    map.setStreetView(pano);
+    svPanoRef.current = pano;
+
+    pano.addListener("visible_changed", () => {
+      const visible = pano.getVisible();
+      setShowSV(visible);
+      if (!visible) { setSvPos(null); setSvHeading(0); }
+    });
+
+    pano.addListener("position_changed", () => {
+      const p = pano.getPosition();
+      if (p) setSvPos({ lat: p.lat(), lng: p.lng() });
+    });
+
+    pano.addListener("pov_changed", () => {
+      setSvHeading(pano.getPov().heading ?? 0);
+    });
+
     return () => {
-      renderer.setMap(null);
-      rendererRef.current = null;
+      google.maps.event.clearInstanceListeners(pano);
+      svPanoRef.current = null;
     };
   }, [map, apiLoaded]);
 
-  // ── Escape cancels both modes ─────────────────────────────────────────────
+  // ── Escape cancels modes ──────────────────────────────────────────────────
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
-      if (isPlacingPoint) onCancelPlacing();
+      if (isPlacingPoint)  onCancelPlacing();
       if (isDirectionMode) setIsDirectionMode(false);
     }
     window.addEventListener("keydown", onKeyDown);
@@ -179,7 +220,7 @@ function MapContent({
 
   const mappablePoints = fireTests.filter((ft) => ft.lat != null && ft.lng != null);
 
-  // ── Map click ─────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────
   function handleMapClick(e: MapMouseEvent) {
     setShowLabelMenu(false);
     if (isPlacingPoint) {
@@ -190,239 +231,214 @@ function MapContent({
     }
   }
 
-  // ── Marker click ─────────────────────────────────────────────────────────
   function handleMarkerClick(ft: FireTest) {
     if (isPlacingPoint) return;
-
     if (isDirectionMode) {
       setIsDirectionMode(false);
       setDirectionTargetId(ft.id);
       getDirections({ lat: ft.lat!, lng: ft.lng! }, ft.name ?? ft.content ?? "destination");
     } else if (!labelMode) {
-      // Attribute selection is disabled while a label mode is active
       onSelectId(ft.id === selectedId ? null : ft.id);
     }
   }
 
-  // ── Locate ────────────────────────────────────────────────────────────────
   function handleLocate() {
     if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserLocation(loc);
-        setShowUserBalloon(true);
-        map?.panTo(loc);
-        map?.setZoom(17);
-        setLocating(false);
+        setUserLocation(loc); setShowUserBalloon(true);
+        map?.panTo(loc); map?.setZoom(17); setLocating(false);
       },
       () => { alert("Unable to retrieve your location."); setLocating(false); }
     );
   }
 
-  // ── Direction ─────────────────────────────────────────────────────────────
   function handleDirectionBtn() {
-    if (hasRoute) {
-      clearRoute();
-    } else {
-      setIsDirectionMode((prev) => !prev);
-    }
+    hasRoute ? clearRoute() : setIsDirectionMode((p) => !p);
   }
 
   function clearRoute() {
     rendererRef.current?.setDirections({ routes: [] } as unknown as google.maps.DirectionsResult);
-    setHasRoute(false);
-    setRouteInfo(null);
-    setDirectionTargetId(null);
+    setHasRoute(false); setRouteInfo(null); setDirectionTargetId(null);
   }
 
   function getDirections(destination: { lat: number; lng: number }, destName: string) {
     if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const origin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setUserLocation(origin);
+      try {
+        const result = await new google.maps.DirectionsService().route({
+          origin, destination, travelMode: google.maps.TravelMode.DRIVING,
+        });
+        rendererRef.current?.setDirections(result);
+        setHasRoute(true);
+        const leg = result.routes[0]?.legs[0];
+        if (leg) setRouteInfo(`${destName} · ${leg.distance?.text} · ${leg.duration?.text}`);
+      } catch {
+        alert("Could not get directions.\n\nEnsure the Directions API is enabled in Google Cloud Console.");
+        setDirectionTargetId(null);
+      }
+    }, () => { alert("Unable to retrieve your location."); setDirectionTargetId(null); });
+  }
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const origin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserLocation(origin);
-
-        try {
-          const service = new google.maps.DirectionsService();
-          const result = await service.route({
-            origin,
-            destination,
-            travelMode: google.maps.TravelMode.DRIVING,
-          });
-
-          rendererRef.current?.setDirections(result);
-          setHasRoute(true);
-
-          // Extract summary info from first leg
-          const leg = result.routes[0]?.legs[0];
-          if (leg) {
-            setRouteInfo(`${destName} · ${leg.distance?.text} · ${leg.duration?.text}`);
-          }
-        } catch (err) {
-          console.error("Directions error:", err);
-          alert(
-            "Could not get directions.\n\nMake sure the Directions API is enabled in Google Cloud Console for your API key."
-          );
-          setDirectionTargetId(null);
-        }
-      },
-      () => { alert("Unable to retrieve your location."); setDirectionTargetId(null); }
-    );
+  function closeSV() {
+    svPanoRef.current?.setVisible(false);
   }
 
   const anyModeActive = isPlacingPoint || isDirectionMode;
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{ position: "relative", width: "100%", height: "100%" }}
-      className={isPlacingPoint ? "map-placing" : isDirectionMode ? "map-direction" : ""}
-    >
-      {/* ── Top-right button stack ── */}
-      {!anyModeActive && (
-        <div className="map-btn-stack">
-          <button className="locate-btn" onClick={handleLocate} disabled={locating}>
-            {locating ? "Locating…" : "📍 Locate"}
-          </button>
-          <button
-            className={`direction-btn ${hasRoute ? "direction-btn--active" : ""}`}
-            onClick={handleDirectionBtn}
-            title={hasRoute ? "Clear route" : "Get directions to a data point"}
-          >
-            {hasRoute ? "🗺 Clear Route" : "🧭 Direction"}
-          </button>
+    <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
 
-          {/* ── Label button + dropdown ── */}
-          <div style={{ position: "relative" }}>
-            <button
-              className={`label-btn ${labelMode ? "label-btn--active" : ""}`}
-              onClick={() => setShowLabelMenu((v) => !v)}
-              title="Show labels on map"
-            >
-              🏷 Label{labelMode ? `: ${labelMode === "pressure" ? "Pressure" : "Flow"}` : ""}
-            </button>
-
-            {showLabelMenu && (
-              <div className="label-menu">
-                <button
-                  className={`label-menu-item ${labelMode === "pressure" ? "label-menu-item--active" : ""}`}
-                  onClick={() => { setLabelMode(labelMode === "pressure" ? null : "pressure"); setShowLabelMenu(false); }}
-                >
-                  💧 Pressure (psi)
-                </button>
-                <button
-                  className={`label-menu-item ${labelMode === "flow" ? "label-menu-item--active" : ""}`}
-                  onClick={() => { setLabelMode(labelMode === "flow" ? null : "flow"); setShowLabelMenu(false); }}
-                >
-                  🌊 Flow (gpm)
-                </button>
-                {labelMode && (
-                  <button
-                    className="label-menu-item label-menu-item--clear"
-                    onClick={() => { setLabelMode(null); setShowLabelMenu(false); }}
-                  >
-                    ✕ Clear Labels
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Place-point banner ── */}
-      {isPlacingPoint && (
-        <div className="placing-banner">
-          📌 Click anywhere on the map to place a point
-          <button className="placing-cancel" onClick={onCancelPlacing}>✕ Cancel</button>
-        </div>
-      )}
-
-      {/* ── Direction mode banner ── */}
-      {isDirectionMode && (
-        <div className="placing-banner direction-banner">
-          🧭 Click on a data point to get directions there
-          <button className="placing-cancel" onClick={() => setIsDirectionMode(false)}>✕ Cancel</button>
-        </div>
-      )}
-
-      {/* ── Route summary bar ── */}
-      {routeInfo && (
-        <div className="route-info-bar">
-          🗺 {routeInfo}
-          <button className="route-clear-btn" onClick={clearRoute} title="Clear route">✕</button>
-        </div>
-      )}
-
-      <Map
-        style={{ width: "100%", height: "100%" }}
-        defaultCenter={DEFAULT_CENTER}
-        defaultZoom={DEFAULT_ZOOM}
-        gestureHandling="greedy"
-        disableDefaultUI={false}
-        onClick={handleMapClick}
-        styles={MAP_STYLES}
-        streetViewControlOptions={streetViewControlOptions}
+      {/* ══ Map half ══════════════════════════════════════════════════════════ */}
+      <div
+        style={{ position: "relative", flex: 1, height: "100%", minWidth: 0 }}
+        className={isPlacingPoint ? "map-placing" : isDirectionMode ? "map-direction" : ""}
       >
-        {/* ── FireTest markers ── */}
-        {mappablePoints.map((ft) => {
-          // Determine label text for this point
-          const labelText =
-            labelMode === "pressure" && ft.pressure != null ? `${ft.pressure} psi` :
-            labelMode === "flow"     && ft.flow     != null ? `${ft.flow} gpm`      :
-            null;
-
-          // Pick icon: direction target → amber, selected → white-ring, labeled → label SVG, default → green dot
-          const icon: google.maps.Icon | undefined =
-            !apiLoaded ? undefined :
-            ft.id === directionTargetId ? (
-              labelText ? makeLabelIcon(labelText, "#f59e0b", "#b45309") : directionDotIcon
-            ) :
-            ft.id === selectedId ? (
-              labelText ? makeLabelIcon(labelText, "#22c55e", "#15803d") : selectedDotIcon
-            ) :
-            labelText ? makeLabelIcon(labelText) :
-            greenDotIcon;
-
-          return (
-            <Marker
-              key={ft.id}
-              position={{ lat: ft.lat!, lng: ft.lng! }}
-              icon={icon}
-              zIndex={ft.id === selectedId || ft.id === directionTargetId ? 10 : 1}
-              onClick={() => handleMarkerClick(ft)}
-            />
-          );
-        })}
-
-        {/* ── User location marker ── */}
-        {userLocation && (
-          <Marker position={userLocation} icon={blueDotIcon} onClick={() => setShowUserBalloon(true)} />
-        )}
-
-        {/* ── User location balloon ── */}
-        {userLocation && showUserBalloon && (
-          <InfoWindow
-            position={userLocation}
-            onCloseClick={() => setShowUserBalloon(false)}
-            headerContent={
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 160 }}>
-                <strong style={{ color: "#1a73e8" }}>📍 You are here</strong>
-                <button onClick={() => setShowUserBalloon(false)}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#666", padding: "0 0 0 12px" }}>
-                  ✕
-                </button>
-              </div>
-            }
-          >
-            <div style={{ fontFamily: "sans-serif", fontSize: 13 }}>
-              {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+        {/* Top-right button stack */}
+        {!anyModeActive && (
+          <div className="map-btn-stack">
+            <button className="locate-btn" onClick={handleLocate} disabled={locating}>
+              {locating ? "Locating…" : "📍 Locate"}
+            </button>
+            <button
+              className={`direction-btn ${hasRoute ? "direction-btn--active" : ""}`}
+              onClick={handleDirectionBtn}
+            >
+              {hasRoute ? "🗺 Clear Route" : "🧭 Direction"}
+            </button>
+            <div style={{ position: "relative" }}>
+              <button
+                className={`label-btn ${labelMode ? "label-btn--active" : ""}`}
+                onClick={() => setShowLabelMenu((v) => !v)}
+              >
+                🏷 Label{labelMode ? `: ${labelMode === "pressure" ? "Pressure" : "Flow"}` : ""}
+              </button>
+              {showLabelMenu && (
+                <div className="label-menu">
+                  <button className={`label-menu-item ${labelMode === "pressure" ? "label-menu-item--active" : ""}`}
+                    onClick={() => { setLabelMode(labelMode === "pressure" ? null : "pressure"); setShowLabelMenu(false); }}>
+                    💧 Pressure (psi)
+                  </button>
+                  <button className={`label-menu-item ${labelMode === "flow" ? "label-menu-item--active" : ""}`}
+                    onClick={() => { setLabelMode(labelMode === "flow" ? null : "flow"); setShowLabelMenu(false); }}>
+                    🌊 Flow (gpm)
+                  </button>
+                  {labelMode && (
+                    <button className="label-menu-item label-menu-item--clear"
+                      onClick={() => { setLabelMode(null); setShowLabelMenu(false); }}>
+                      ✕ Clear Labels
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          </InfoWindow>
+          </div>
         )}
-      </Map>
+
+        {/* Banners */}
+        {isPlacingPoint && (
+          <div className="placing-banner">
+            📌 Click anywhere on the map to place a point
+            <button className="placing-cancel" onClick={onCancelPlacing}>✕ Cancel</button>
+          </div>
+        )}
+        {isDirectionMode && (
+          <div className="placing-banner direction-banner">
+            🧭 Click on a data point to get directions there
+            <button className="placing-cancel" onClick={() => setIsDirectionMode(false)}>✕ Cancel</button>
+          </div>
+        )}
+        {routeInfo && (
+          <div className="route-info-bar">
+            🗺 {routeInfo}
+            <button className="route-clear-btn" onClick={clearRoute}>✕</button>
+          </div>
+        )}
+
+        <Map
+          style={{ width: "100%", height: "100%" }}
+          defaultCenter={DEFAULT_CENTER}
+          defaultZoom={DEFAULT_ZOOM}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          onClick={handleMapClick}
+          styles={MAP_STYLES}
+          streetViewControlOptions={streetViewControlOptions}
+        >
+          {/* FireTest markers */}
+          {mappablePoints.map((ft) => {
+            const labelText =
+              labelMode === "pressure" && ft.pressure != null ? `${ft.pressure} psi` :
+              labelMode === "flow"     && ft.flow     != null ? `${ft.flow} gpm`      : null;
+            const icon: google.maps.Icon | undefined =
+              !apiLoaded ? undefined :
+              ft.id === directionTargetId ? (labelText ? makeLabelIcon(labelText,"#f59e0b","#b45309") : directionDotIcon) :
+              ft.id === selectedId        ? (labelText ? makeLabelIcon(labelText,"#22c55e","#15803d") : selectedDotIcon)  :
+              labelText ? makeLabelIcon(labelText) : greenDotIcon;
+            return (
+              <Marker key={ft.id} position={{ lat: ft.lat!, lng: ft.lng! }}
+                icon={icon} zIndex={ft.id === selectedId || ft.id === directionTargetId ? 10 : 1}
+                onClick={() => handleMarkerClick(ft)} />
+            );
+          })}
+
+          {/* User location */}
+          {userLocation && (
+            <Marker position={userLocation} icon={blueDotIcon} onClick={() => setShowUserBalloon(true)} />
+          )}
+          {userLocation && showUserBalloon && (
+            <InfoWindow position={userLocation} onCloseClick={() => setShowUserBalloon(false)}
+              headerContent={
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", minWidth:160 }}>
+                  <strong style={{ color:"#1a73e8" }}>📍 You are here</strong>
+                  <button onClick={() => setShowUserBalloon(false)}
+                    style={{ background:"none", border:"none", cursor:"pointer", fontSize:16, color:"#666", padding:"0 0 0 12px" }}>✕</button>
+                </div>
+              }>
+              <div style={{ fontFamily:"sans-serif", fontSize:13 }}>
+                {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+              </div>
+            </InfoWindow>
+          )}
+
+          {/* Street View walking-man + direction cone synced marker */}
+          {svPos && apiLoaded && (
+            <Marker
+              position={svPos}
+              icon={makeSvMarkerIcon(svHeading)}
+              zIndex={20}
+            />
+          )}
+        </Map>
+      </div>
+
+      {/* ══ Street View panel (always in DOM; flex:0 → flex:1 when open) ═════ */}
+      <div
+        style={{
+          position: "relative",
+          height: "100%",
+          flex: showSV ? 1 : 0,
+          overflow: "hidden",
+          borderLeft: showSV ? "3px solid #333" : "none",
+          transition: "flex 0.25s ease",
+        }}
+      >
+        {/* Panorama renders here */}
+        <div ref={svDivRef} style={{ width: "100%", height: "100%" }} />
+
+        {/* Close button overlay */}
+        {showSV && (
+          <button className="sv-close-btn" onClick={closeSV} title="Close Street View">
+            ✕ Close
+          </button>
+        )}
+      </div>
+
     </div>
   );
 }
