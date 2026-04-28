@@ -83,18 +83,32 @@ export default function FireTestPanel({
     setSaving(true);
     setEditingField(null);
 
-    await client.models.FireTest.update({
-      id: selectedPoint.id,
-      name:     draft.name     !== "" ? draft.name     : null,
-      content:  draft.content  !== "" ? draft.content  : null,
-      lat:      draft.lat      !== "" ? parseFloat(draft.lat)      : null,
-      lng:      draft.lng      !== "" ? parseFloat(draft.lng)      : null,
-      pressure: draft.pressure !== "" ? parseFloat(draft.pressure) : null,
-      flow:     draft.flow     !== "" ? parseFloat(draft.flow)     : null,
-    });
+    try {
+      const { data: updated, errors } = await client.models.FireTest.update({
+        id:       selectedPoint.id,
+        name:     draft.name     !== "" ? draft.name                  : null,
+        content:  draft.content  !== "" ? draft.content               : null,
+        lat:      draft.lat      !== "" ? parseFloat(draft.lat)       : null,
+        lng:      draft.lng      !== "" ? parseFloat(draft.lng)       : null,
+        pressure: draft.pressure !== "" ? parseFloat(draft.pressure)  : null,
+        flow:     draft.flow     !== "" ? parseFloat(draft.flow)      : null,
+      });
 
-    // Snapshot what we just saved so isDirty clears immediately
-    savedDraftRef.current = { ...draft };
+      if (errors && errors.length > 0) {
+        console.error("Amplify update errors:", errors);
+        alert("Save failed: " + errors.map((e) => e.message).join(", "));
+        setSaving(false);
+        return;
+      }
+
+      console.log("Saved:", updated);
+      // Snapshot saved state so isDirty clears immediately
+      savedDraftRef.current = { ...draft };
+    } catch (err) {
+      console.error("Update exception:", err);
+      alert("Save failed: " + String(err));
+    }
+
     setSaving(false);
   }
 
