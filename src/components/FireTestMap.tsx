@@ -116,9 +116,8 @@ function MapContent({
     const svg = encodeURIComponent(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="40">` +
       `<circle cx="${w / 2}" cy="10" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>` +
-      `<rect x="1" y="24" width="${w - 2}" height="15" rx="4" fill="#1e1e2e"/>` +
       `<text x="${w / 2}" y="34" text-anchor="middle" font-family="Arial,sans-serif" ` +
-      `font-size="10" fill="#fff" font-weight="bold">${text}</text>` +
+      `font-size="11" fill="#a855f7" font-weight="bold">${text}</text>` +
       `</svg>`
     );
     return {
