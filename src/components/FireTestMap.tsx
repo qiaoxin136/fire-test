@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   APIProvider,
   Map,
   Marker,
   InfoWindow,
   useMap,
+  useApiIsLoaded,
 } from "@vis.gl/react-google-maps";
 import type { MapMouseEvent } from "@vis.gl/react-google-maps";
 import type { Schema } from "../../amplify/data/resource";
@@ -23,25 +24,18 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 const DEFAULT_CENTER = { lat: 35.7796, lng: -78.6382 };
 const DEFAULT_ZOOM = 15;
 
-// SVG icons (no mapId required)
-const GREEN_DOT = {
-  url: `data:image/svg+xml,${encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">' +
-    '<circle cx="10" cy="10" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/>' +
-    '</svg>'
-  )}`,
-  anchor: { x: 10, y: 10 } as google.maps.Point,
-};
+const GREEN_DOT_SVG = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">' +
+  '<circle cx="10" cy="10" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/>' +
+  '</svg>'
+);
 
-const BLUE_DOT = {
-  url: `data:image/svg+xml,${encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
-    '<circle cx="11" cy="11" r="9" fill="#1a73e8" stroke="#0d47a1" stroke-width="2.5"/>' +
-    '<circle cx="11" cy="11" r="3" fill="#fff"/>' +
-    '</svg>'
-  )}`,
-  anchor: { x: 11, y: 11 } as google.maps.Point,
-};
+const BLUE_DOT_SVG = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
+  '<circle cx="11" cy="11" r="9" fill="#1a73e8" stroke="#0d47a1" stroke-width="2.5"/>' +
+  '<circle cx="11" cy="11" r="3" fill="#fff"/>' +
+  '</svg>'
+);
 
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "poi",          stylers: [{ visibility: "off" }] },
@@ -69,6 +63,26 @@ function MapContent({
   onCancelPlacing,
 }: FireTestMapProps) {
   const map = useMap();
+  const apiLoaded = useApiIsLoaded();
+
+  // Build icons only after the Maps API is fully loaded
+  const greenDotIcon = useMemo((): google.maps.Icon | undefined => {
+    if (!apiLoaded) return undefined;
+    return {
+      url: `data:image/svg+xml,${GREEN_DOT_SVG}`,
+      anchor: new google.maps.Point(10, 10),
+      scaledSize: new google.maps.Size(20, 20),
+    };
+  }, [apiLoaded]);
+
+  const blueDotIcon = useMemo((): google.maps.Icon | undefined => {
+    if (!apiLoaded) return undefined;
+    return {
+      url: `data:image/svg+xml,${BLUE_DOT_SVG}`,
+      anchor: new google.maps.Point(11, 11),
+      scaledSize: new google.maps.Size(22, 22),
+    };
+  }, [apiLoaded]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -162,7 +176,7 @@ function MapContent({
           <Marker
             key={ft.id}
             position={{ lat: ft.lat!, lng: ft.lng! }}
-            icon={GREEN_DOT}
+            icon={greenDotIcon}
             onClick={() => !isPlacingPoint && setSelectedId(ft.id)}
           />
         ))}
@@ -204,7 +218,7 @@ function MapContent({
         {userLocation && (
           <Marker
             position={userLocation}
-            icon={BLUE_DOT}
+            icon={blueDotIcon}
             onClick={() => setShowUserBalloon(true)}
           />
         )}
