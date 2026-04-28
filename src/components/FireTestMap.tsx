@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import {
   APIProvider,
   Map,
-  AdvancedMarker,
+  Marker,
   InfoWindow,
-  Pin,
   useMap,
 } from "@vis.gl/react-google-maps";
 import type { MapMouseEvent } from "@vis.gl/react-google-maps";
@@ -24,6 +23,35 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 const DEFAULT_CENTER = { lat: 35.7796, lng: -78.6382 };
 const DEFAULT_ZOOM = 15;
 
+// SVG icons (no mapId required)
+const GREEN_DOT = {
+  url: `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">' +
+    '<circle cx="10" cy="10" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/>' +
+    '</svg>'
+  )}`,
+  anchor: { x: 10, y: 10 } as google.maps.Point,
+};
+
+const BLUE_DOT = {
+  url: `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
+    '<circle cx="11" cy="11" r="9" fill="#1a73e8" stroke="#0d47a1" stroke-width="2.5"/>' +
+    '<circle cx="11" cy="11" r="3" fill="#fff"/>' +
+    '</svg>'
+  )}`,
+  anchor: { x: 11, y: 11 } as google.maps.Point,
+};
+
+const MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { featureType: "poi",          stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park",     stylers: [{ visibility: "off" }] },
+  { featureType: "poi.school",   stylers: [{ visibility: "off" }] },
+  { featureType: "poi.medical",  stylers: [{ visibility: "off" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "transit",      stylers: [{ visibility: "off" }] },
+];
+
 // ── Outer wrapper ─────────────────────────────────────────────────────────────
 export default function FireTestMap(props: FireTestMapProps) {
   return (
@@ -33,7 +61,7 @@ export default function FireTestMap(props: FireTestMapProps) {
   );
 }
 
-// ── Inner component (uses useMap hook) ────────────────────────────────────────
+// ── Inner component ───────────────────────────────────────────────────────────
 function MapContent({
   fireTests,
   isPlacingPoint,
@@ -46,7 +74,6 @@ function MapContent({
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showUserBalloon, setShowUserBalloon] = useState(false);
   const [locating, setLocating] = useState(false);
-
 
   // Cancel placing mode with Escape key
   useEffect(() => {
@@ -63,7 +90,6 @@ function MapContent({
   );
   const selectedPoint = mappablePoints.find((ft) => ft.id === selectedId);
 
-  // ── Map click ────────────────────────────────────────────────────────────────
   function handleMapClick(e: MapMouseEvent) {
     if (isPlacingPoint) {
       const latLng = e.detail.latLng;
@@ -73,7 +99,6 @@ function MapContent({
     }
   }
 
-  // ── Locate ───────────────────────────────────────────────────────────────────
   function handleLocate() {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
@@ -130,32 +155,16 @@ function MapContent({
         gestureHandling="greedy"
         disableDefaultUI={false}
         onClick={handleMapClick}
-        styles={[
-          { featureType: "poi",          stylers: [{ visibility: "off" }] },
-          { featureType: "poi.park",     stylers: [{ visibility: "off" }] },
-          { featureType: "poi.school",   stylers: [{ visibility: "off" }] },
-          { featureType: "poi.medical",  stylers: [{ visibility: "off" }] },
-          { featureType: "poi.business", stylers: [{ visibility: "off" }] },
-          { featureType: "transit",      stylers: [{ visibility: "off" }] },
-        ]}
+        styles={MAP_STYLES}
       >
-        {/* ── FireTest markers ── */}
+        {/* ── FireTest markers (green 20px dot) ── */}
         {mappablePoints.map((ft) => (
-          <AdvancedMarker
+          <Marker
             key={ft.id}
             position={{ lat: ft.lat!, lng: ft.lng! }}
+            icon={GREEN_DOT}
             onClick={() => !isPlacingPoint && setSelectedId(ft.id)}
-          >
-            <div style={{
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              background: "#22c55e",
-              border: "3px solid #15803d",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-              cursor: "pointer",
-            }} />
-          </AdvancedMarker>
+          />
         ))}
 
         {/* ── FireTest info window ── */}
@@ -191,14 +200,13 @@ function MapContent({
             </InfoWindow>
           )}
 
-        {/* ── User location marker ── */}
+        {/* ── User location marker (blue dot) ── */}
         {userLocation && (
-          <AdvancedMarker
+          <Marker
             position={userLocation}
+            icon={BLUE_DOT}
             onClick={() => setShowUserBalloon(true)}
-          >
-            <Pin background="#1a73e8" borderColor="#0d47a1" glyphColor="#ffffff" />
-          </AdvancedMarker>
+          />
         )}
 
         {/* ── User location balloon ── */}
