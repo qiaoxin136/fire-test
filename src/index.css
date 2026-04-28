@@ -65,6 +65,45 @@ html, body, #root {
   background: #ffcdd2;
 }
 
+/* ── User bar (below panel header) ─────────────────── */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #161622;
+  border-bottom: 1px solid #2a2a3e;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.user-email {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.btn-signout {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: #9ca3af;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.btn-signout:hover {
+  background: #e53935;
+  border-color: #e53935;
+  color: #fff;
+}
+
 /* ── Point List ─────────────────────────────────────── */
 .point-list {
   list-style: none;

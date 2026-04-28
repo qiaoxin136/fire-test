@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
+import { Authenticator, useAuthenticator } from "@aws-amplify/ui-react";
 import FireTestMap from "./components/FireTestMap";
 import FireTestPanel from "./components/FireTestPanel";
 
 const client = generateClient<Schema>();
 
-function App() {
+// Inner component — only rendered once the user is signed in
+function AppShell() {
+  const { user, signOut } = useAuthenticator((ctx) => [ctx.user]);
+
   const [fireTests, setFireTests] = useState<Array<Schema["FireTest"]["type"]>>([]);
   const [isPlacingPoint, setIsPlacingPoint] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -40,6 +44,8 @@ function App() {
         onStartPlacing={handleStartPlacing}
         selectedId={selectedId}
         onSelectId={setSelectedId}
+        userEmail={user?.signInDetails?.loginId ?? user?.username ?? ""}
+        onSignOut={signOut}
       />
       <div className="map-container">
         <FireTestMap
@@ -52,6 +58,15 @@ function App() {
         />
       </div>
     </div>
+  );
+}
+
+// Outer component — wraps everything in the Authenticator gate
+function App() {
+  return (
+    <Authenticator>
+      <AppShell />
+    </Authenticator>
   );
 }
 

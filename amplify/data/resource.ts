@@ -17,7 +17,7 @@ const schema = a.schema({
       flow: a.float(),
       photoKeys: a.string().array(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey(), allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

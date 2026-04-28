@@ -27,6 +27,8 @@ interface FireTestPanelProps {
   onStartPlacing: () => void;
   selectedId: string | null;
   onSelectId: (id: string | null) => void;
+  userEmail: string;
+  onSignOut: () => void;
 }
 
 export default function FireTestPanel({
@@ -35,6 +37,8 @@ export default function FireTestPanel({
   onStartPlacing,
   selectedId,
   onSelectId,
+  userEmail,
+  onSignOut,
 }: FireTestPanelProps) {
   const selectedPoint = fireTests.find((ft) => ft.id === selectedId) ?? null;
 
@@ -123,6 +127,12 @@ export default function FireTestPanel({
         >
           {isPlacingPoint ? "📌 Click map…" : "+ Add Point"}
         </button>
+      </div>
+
+      {/* ── User bar ── */}
+      <div className="user-bar">
+        <span className="user-email" title={userEmail}>👤 {userEmail}</span>
+        <button className="btn-signout" onClick={onSignOut}>Sign out</button>
       </div>
 
       {/* ── Point list ── */}
