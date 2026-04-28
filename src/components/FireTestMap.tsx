@@ -101,6 +101,11 @@ function MapContent({
     return { url: `data:image/svg+xml,${BLUE_DOT_SVG}`, anchor: new google.maps.Point(11, 11), scaledSize: new google.maps.Size(22, 22) };
   }, [apiLoaded]);
 
+  const streetViewControlOptions = useMemo(() => {
+    if (!apiLoaded) return undefined;
+    return { position: google.maps.ControlPosition.LEFT_BOTTOM };
+  }, [apiLoaded]);
+
   const directionDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
     return { url: `data:image/svg+xml,${DIRECTION_DOT_SVG}`, anchor: new google.maps.Point(13, 13), scaledSize: new google.maps.Size(26, 26) };
@@ -359,6 +364,7 @@ function MapContent({
         disableDefaultUI={false}
         onClick={handleMapClick}
         styles={MAP_STYLES}
+        streetViewControlOptions={streetViewControlOptions}
       >
         {/* ── FireTest markers ── */}
         {mappablePoints.map((ft) => {
