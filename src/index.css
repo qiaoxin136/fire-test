@@ -109,11 +109,28 @@ html, body, #root {
   list-style: none;
   margin: 0;
   padding: 8px;
-  overflow-y: auto;
+  overflow-y: scroll;   /* always show scrollbar track */
   flex: 1;
+  min-height: 0;        /* lets the flex item shrink below content height */
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Styled scrollbar (Webkit / Chromium) */
+.point-list::-webkit-scrollbar {
+  width: 6px;
+}
+.point-list::-webkit-scrollbar-track {
+  background: #13131f;
+  border-radius: 3px;
+}
+.point-list::-webkit-scrollbar-thumb {
+  background: #3a3a55;
+  border-radius: 3px;
+}
+.point-list::-webkit-scrollbar-thumb:hover {
+  background: #555577;
 }
 
 .empty {
