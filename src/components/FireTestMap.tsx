@@ -7,6 +7,7 @@ import {
   useMap,
   useApiIsLoaded,
 } from "@vis.gl/react-google-maps";
+// InfoWindow kept for user-location balloon
 import type { MapMouseEvent } from "@vis.gl/react-google-maps";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -17,6 +18,8 @@ interface FireTestMapProps {
   isPlacingPoint: boolean;
   onPointPlaced: (lat: number, lng: number) => void;
   onCancelPlacing: () => void;
+  selectedId: string | null;
+  onSelectId: (id: string | null) => void;
 }
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
@@ -61,6 +64,8 @@ function MapContent({
   isPlacingPoint,
   onPointPlaced,
   onCancelPlacing,
+  selectedId,
+  onSelectId,
 }: FireTestMapProps) {
   const map = useMap();
   const apiLoaded = useApiIsLoaded();
@@ -75,6 +80,20 @@ function MapContent({
     };
   }, [apiLoaded]);
 
+  const selectedDotIcon = useMemo((): google.maps.Icon | undefined => {
+    if (!apiLoaded) return undefined;
+    return {
+      url: `data:image/svg+xml,${encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">' +
+        '<circle cx="14" cy="14" r="12" fill="white" stroke="#15803d" stroke-width="2"/>' +
+        '<circle cx="14" cy="14" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2"/>' +
+        '</svg>'
+      )}`,
+      anchor: new google.maps.Point(14, 14),
+      scaledSize: new google.maps.Size(28, 28),
+    };
+  }, [apiLoaded]);
+
   const blueDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
     return {
@@ -84,7 +103,6 @@ function MapContent({
     };
   }, [apiLoaded]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showUserBalloon, setShowUserBalloon] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -102,14 +120,13 @@ function MapContent({
   const mappablePoints = fireTests.filter(
     (ft) => ft.lat != null && ft.lng != null
   );
-  const selectedPoint = mappablePoints.find((ft) => ft.id === selectedId);
 
   function handleMapClick(e: MapMouseEvent) {
     if (isPlacingPoint) {
       const latLng = e.detail.latLng;
       if (latLng) onPointPlaced(latLng.lat, latLng.lng);
     } else {
-      setSelectedId(null);
+      onSelectId(null);
     }
   }
 
@@ -171,48 +188,16 @@ function MapContent({
         onClick={handleMapClick}
         styles={MAP_STYLES}
       >
-        {/* ── FireTest markers (green 20px dot) ── */}
+        {/* ── FireTest markers ── */}
         {mappablePoints.map((ft) => (
           <Marker
             key={ft.id}
             position={{ lat: ft.lat!, lng: ft.lng! }}
-            icon={greenDotIcon}
-            onClick={() => !isPlacingPoint && setSelectedId(ft.id)}
+            icon={ft.id === selectedId ? selectedDotIcon : greenDotIcon}
+            zIndex={ft.id === selectedId ? 10 : 1}
+            onClick={() => !isPlacingPoint && onSelectId(ft.id === selectedId ? null : ft.id)}
           />
         ))}
-
-        {/* ── FireTest info window ── */}
-        {selectedPoint &&
-          selectedPoint.lat != null &&
-          selectedPoint.lng != null && (
-            <InfoWindow
-              position={{ lat: selectedPoint.lat, lng: selectedPoint.lng }}
-              onCloseClick={() => setSelectedId(null)}
-            >
-              <div style={{ fontFamily: "sans-serif", minWidth: 160 }}>
-                <h3 style={{ margin: "0 0 8px", color: "#b71c1c" }}>
-                  🔥 {selectedPoint.name ?? selectedPoint.content ?? "FireTest"}
-                </h3>
-                <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                  <tbody>
-                    {selectedPoint.content && (
-                      <InfoRow label="Note" value={selectedPoint.content} />
-                    )}
-                    <InfoRow label="Lat" value={selectedPoint.lat?.toFixed(6)} />
-                    <InfoRow label="Lng" value={selectedPoint.lng?.toFixed(6)} />
-                    <InfoRow
-                      label="Pressure"
-                      value={selectedPoint.pressure != null ? `${selectedPoint.pressure} psi` : "—"}
-                    />
-                    <InfoRow
-                      label="Flow"
-                      value={selectedPoint.flow != null ? `${selectedPoint.flow} gpm` : "—"}
-                    />
-                  </tbody>
-                </table>
-              </div>
-            </InfoWindow>
-          )}
 
         {/* ── User location marker (blue dot) ── */}
         {userLocation && (
@@ -259,13 +244,3 @@ function MapContent({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <tr>
-      <td style={{ fontWeight: 600, paddingRight: 8, paddingBottom: 4, color: "#555", fontSize: 13 }}>
-        {label}
-      </td>
-      <td style={{ paddingBottom: 4, fontSize: 13 }}>{value ?? "—"}</td>
-    </tr>
-  );
-}

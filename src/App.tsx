@@ -9,6 +9,7 @@ const client = generateClient<Schema>();
 function App() {
   const [fireTests, setFireTests] = useState<Array<Schema["FireTest"]["type"]>>([]);
   const [isPlacingPoint, setIsPlacingPoint] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     const sub = client.models.FireTest.observeQuery().subscribe({
@@ -17,15 +18,14 @@ function App() {
     return () => sub.unsubscribe();
   }, []);
 
-  // Step 1 — panel button clicked: enter "click to place" mode
   function handleStartPlacing() {
     setIsPlacingPoint(true);
   }
 
-  // Step 2 — user clicked on the map: save lat/lng immediately, no prompts
   async function handlePointPlaced(lat: number, lng: number) {
     setIsPlacingPoint(false);
-    await client.models.FireTest.create({ lat, lng });
+    const { data } = await client.models.FireTest.create({ lat, lng });
+    if (data) setSelectedId(data.id);
   }
 
   function handleCancelPlacing() {
@@ -38,6 +38,8 @@ function App() {
         fireTests={fireTests}
         isPlacingPoint={isPlacingPoint}
         onStartPlacing={handleStartPlacing}
+        selectedId={selectedId}
+        onSelectId={setSelectedId}
       />
       <div className="map-container">
         <FireTestMap
@@ -45,6 +47,8 @@ function App() {
           isPlacingPoint={isPlacingPoint}
           onPointPlaced={handlePointPlaced}
           onCancelPlacing={handleCancelPlacing}
+          selectedId={selectedId}
+          onSelectId={setSelectedId}
         />
       </div>
     </div>
