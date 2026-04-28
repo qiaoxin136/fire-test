@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   APIProvider,
   Map,
@@ -7,7 +7,6 @@ import {
   useMap,
   useApiIsLoaded,
 } from "@vis.gl/react-google-maps";
-// InfoWindow kept for user-location balloon
 import type { MapMouseEvent } from "@vis.gl/react-google-maps";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -37,6 +36,13 @@ const BLUE_DOT_SVG = encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
   '<circle cx="11" cy="11" r="9" fill="#1a73e8" stroke="#0d47a1" stroke-width="2.5"/>' +
   '<circle cx="11" cy="11" r="3" fill="#fff"/>' +
+  '</svg>'
+);
+
+const DIRECTION_DOT_SVG = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">' +
+  '<circle cx="13" cy="13" r="11" fill="#f59e0b" stroke="#b45309" stroke-width="2.5"/>' +
+  '<circle cx="13" cy="13" r="4" fill="#fff"/>' +
   '</svg>'
 );
 
@@ -70,14 +76,10 @@ function MapContent({
   const map = useMap();
   const apiLoaded = useApiIsLoaded();
 
-  // Build icons only after the Maps API is fully loaded
+  // ── Icons (built after API loads) ─────────────────────────────────────────
   const greenDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
-    return {
-      url: `data:image/svg+xml,${GREEN_DOT_SVG}`,
-      anchor: new google.maps.Point(10, 10),
-      scaledSize: new google.maps.Size(20, 20),
-    };
+    return { url: `data:image/svg+xml,${GREEN_DOT_SVG}`, anchor: new google.maps.Point(10, 10), scaledSize: new google.maps.Size(20, 20) };
   }, [apiLoaded]);
 
   const selectedDotIcon = useMemo((): google.maps.Icon | undefined => {
@@ -96,45 +98,84 @@ function MapContent({
 
   const blueDotIcon = useMemo((): google.maps.Icon | undefined => {
     if (!apiLoaded) return undefined;
-    return {
-      url: `data:image/svg+xml,${BLUE_DOT_SVG}`,
-      anchor: new google.maps.Point(11, 11),
-      scaledSize: new google.maps.Size(22, 22),
-    };
+    return { url: `data:image/svg+xml,${BLUE_DOT_SVG}`, anchor: new google.maps.Point(11, 11), scaledSize: new google.maps.Size(22, 22) };
   }, [apiLoaded]);
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [showUserBalloon, setShowUserBalloon] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const directionDotIcon = useMemo((): google.maps.Icon | undefined => {
+    if (!apiLoaded) return undefined;
+    return { url: `data:image/svg+xml,${DIRECTION_DOT_SVG}`, anchor: new google.maps.Point(13, 13), scaledSize: new google.maps.Size(26, 26) };
+  }, [apiLoaded]);
 
-  // Cancel placing mode with Escape key
+  // ── State ─────────────────────────────────────────────────────────────────
+  const [userLocation, setUserLocation]       = useState<{ lat: number; lng: number } | null>(null);
+  const [showUserBalloon, setShowUserBalloon] = useState(false);
+  const [locating, setLocating]               = useState(false);
+  const [isDirectionMode, setIsDirectionMode] = useState(false);
+  const [directionTargetId, setDirectionTargetId] = useState<string | null>(null);
+  const [hasRoute, setHasRoute]               = useState(false);
+  const [routeInfo, setRouteInfo]             = useState<string | null>(null);
+
+  // Directions renderer lives outside React render cycle
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+
+  // ── Init DirectionsRenderer when map is ready ────────────────────────────
   useEffect(() => {
-    if (!isPlacingPoint) return;
+    if (!map || !apiLoaded) return;
+    const renderer = new google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: false,
+      polylineOptions: {
+        strokeColor: "#1a73e8",
+        strokeWeight: 5,
+        strokeOpacity: 0.85,
+      },
+    });
+    rendererRef.current = renderer;
+    return () => {
+      renderer.setMap(null);
+      rendererRef.current = null;
+    };
+  }, [map, apiLoaded]);
+
+  // ── Escape cancels both modes ─────────────────────────────────────────────
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancelPlacing();
+      if (e.key !== "Escape") return;
+      if (isPlacingPoint) onCancelPlacing();
+      if (isDirectionMode) setIsDirectionMode(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isPlacingPoint, onCancelPlacing]);
+  }, [isPlacingPoint, isDirectionMode, onCancelPlacing]);
 
-  const mappablePoints = fireTests.filter(
-    (ft) => ft.lat != null && ft.lng != null
-  );
+  const mappablePoints = fireTests.filter((ft) => ft.lat != null && ft.lng != null);
 
+  // ── Map click ─────────────────────────────────────────────────────────────
   function handleMapClick(e: MapMouseEvent) {
     if (isPlacingPoint) {
-      const latLng = e.detail.latLng;
-      if (latLng) onPointPlaced(latLng.lat, latLng.lng);
-    } else {
+      const ll = e.detail.latLng;
+      if (ll) onPointPlaced(ll.lat, ll.lng);
+    } else if (!isDirectionMode) {
       onSelectId(null);
     }
   }
 
-  function handleLocate() {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
+  // ── Marker click ─────────────────────────────────────────────────────────
+  function handleMarkerClick(ft: FireTest) {
+    if (isPlacingPoint) return;
+
+    if (isDirectionMode) {
+      setIsDirectionMode(false);
+      setDirectionTargetId(ft.id);
+      getDirections({ lat: ft.lat!, lng: ft.lng! }, ft.name ?? ft.content ?? "destination");
+    } else {
+      onSelectId(ft.id === selectedId ? null : ft.id);
     }
+  }
+
+  // ── Locate ────────────────────────────────────────────────────────────────
+  function handleLocate() {
+    if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -145,37 +186,106 @@ function MapContent({
         map?.setZoom(17);
         setLocating(false);
       },
-      () => {
-        alert("Unable to retrieve your location.");
-        setLocating(false);
-      }
+      () => { alert("Unable to retrieve your location."); setLocating(false); }
     );
   }
+
+  // ── Direction ─────────────────────────────────────────────────────────────
+  function handleDirectionBtn() {
+    if (hasRoute) {
+      clearRoute();
+    } else {
+      setIsDirectionMode((prev) => !prev);
+    }
+  }
+
+  function clearRoute() {
+    rendererRef.current?.setDirections({ routes: [] } as unknown as google.maps.DirectionsResult);
+    setHasRoute(false);
+    setRouteInfo(null);
+    setDirectionTargetId(null);
+  }
+
+  function getDirections(destination: { lat: number; lng: number }, destName: string) {
+    if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const origin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(origin);
+
+        try {
+          const service = new google.maps.DirectionsService();
+          const result = await service.route({
+            origin,
+            destination,
+            travelMode: google.maps.TravelMode.DRIVING,
+          });
+
+          rendererRef.current?.setDirections(result);
+          setHasRoute(true);
+
+          // Extract summary info from first leg
+          const leg = result.routes[0]?.legs[0];
+          if (leg) {
+            setRouteInfo(`${destName} · ${leg.distance?.text} · ${leg.duration?.text}`);
+          }
+        } catch (err) {
+          console.error("Directions error:", err);
+          alert(
+            "Could not get directions.\n\nMake sure the Directions API is enabled in Google Cloud Console for your API key."
+          );
+          setDirectionTargetId(null);
+        }
+      },
+      () => { alert("Unable to retrieve your location."); setDirectionTargetId(null); }
+    );
+  }
+
+  const anyModeActive = isPlacingPoint || isDirectionMode;
 
   return (
     <div
       style={{ position: "relative", width: "100%", height: "100%" }}
-      className={isPlacingPoint ? "map-placing" : ""}
+      className={isPlacingPoint ? "map-placing" : isDirectionMode ? "map-direction" : ""}
     >
-      {/* ── Locate button ── */}
-      {!isPlacingPoint && (
-        <button
-          className="locate-btn"
-          onClick={handleLocate}
-          disabled={locating}
-          title="Zoom to my location"
-        >
-          {locating ? "Locating…" : "📍 Locate"}
-        </button>
+      {/* ── Top-right button stack ── */}
+      {!anyModeActive && (
+        <div className="map-btn-stack">
+          <button className="locate-btn" onClick={handleLocate} disabled={locating}>
+            {locating ? "Locating…" : "📍 Locate"}
+          </button>
+          <button
+            className={`direction-btn ${hasRoute ? "direction-btn--active" : ""}`}
+            onClick={handleDirectionBtn}
+            title={hasRoute ? "Clear route" : "Get directions to a data point"}
+          >
+            {hasRoute ? "🗺 Clear Route" : "🧭 Direction"}
+          </button>
+        </div>
       )}
 
-      {/* ── Placing mode banner ── */}
+      {/* ── Place-point banner ── */}
       {isPlacingPoint && (
         <div className="placing-banner">
           📌 Click anywhere on the map to place a point
-          <button className="placing-cancel" onClick={onCancelPlacing}>
-            ✕ Cancel
-          </button>
+          <button className="placing-cancel" onClick={onCancelPlacing}>✕ Cancel</button>
+        </div>
+      )}
+
+      {/* ── Direction mode banner ── */}
+      {isDirectionMode && (
+        <div className="placing-banner direction-banner">
+          🧭 Click on a data point to get directions there
+          <button className="placing-cancel" onClick={() => setIsDirectionMode(false)}>✕ Cancel</button>
+        </div>
+      )}
+
+      {/* ── Route summary bar ── */}
+      {routeInfo && (
+        <div className="route-info-bar">
+          🗺 {routeInfo}
+          <button className="route-clear-btn" onClick={clearRoute} title="Clear route">✕</button>
         </div>
       )}
 
@@ -193,19 +303,19 @@ function MapContent({
           <Marker
             key={ft.id}
             position={{ lat: ft.lat!, lng: ft.lng! }}
-            icon={ft.id === selectedId ? selectedDotIcon : greenDotIcon}
-            zIndex={ft.id === selectedId ? 10 : 1}
-            onClick={() => !isPlacingPoint && onSelectId(ft.id === selectedId ? null : ft.id)}
+            icon={
+              ft.id === directionTargetId ? directionDotIcon :
+              ft.id === selectedId        ? selectedDotIcon  :
+                                            greenDotIcon
+            }
+            zIndex={ft.id === selectedId || ft.id === directionTargetId ? 10 : 1}
+            onClick={() => handleMarkerClick(ft)}
           />
         ))}
 
-        {/* ── User location marker (blue dot) ── */}
+        {/* ── User location marker ── */}
         {userLocation && (
-          <Marker
-            position={userLocation}
-            icon={blueDotIcon}
-            onClick={() => setShowUserBalloon(true)}
-          />
+          <Marker position={userLocation} icon={blueDotIcon} onClick={() => setShowUserBalloon(true)} />
         )}
 
         {/* ── User location balloon ── */}
@@ -216,26 +326,15 @@ function MapContent({
             headerContent={
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 160 }}>
                 <strong style={{ color: "#1a73e8" }}>📍 You are here</strong>
-                <button
-                  onClick={() => setShowUserBalloon(false)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 16,
-                    color: "#666",
-                    padding: "0 0 0 12px",
-                    lineHeight: 1,
-                  }}
-                  title="Close"
-                >
+                <button onClick={() => setShowUserBalloon(false)}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#666", padding: "0 0 0 12px" }}>
                   ✕
                 </button>
               </div>
             }
           >
             <div style={{ fontFamily: "sans-serif", fontSize: 13 }}>
-              <div>{userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}</div>
+              {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
             </div>
           </InfoWindow>
         )}
@@ -243,4 +342,3 @@ function MapContent({
     </div>
   );
 }
-
