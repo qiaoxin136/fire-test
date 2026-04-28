@@ -10,6 +10,11 @@ const schema = a.schema({
   FireTest: a
     .model({
       content: a.string(),
+      lat: a.float(),
+      lng: a.float(),
+      pressure: a.float(),
+      flow: a.float(),
+      photoKeys: a.string().array(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 });
