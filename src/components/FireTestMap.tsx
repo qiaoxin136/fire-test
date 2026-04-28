@@ -112,18 +112,18 @@ function MapContent({
     fill = "#22c55e",
     stroke = "#15803d"
   ): google.maps.Icon {
-    const w = Math.max(56, text.length * 7 + 16);
+    const w = Math.max(70, text.length * 10 + 16);
     const svg = encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="40">` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="46">` +
       `<circle cx="${w / 2}" cy="10" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>` +
-      `<text x="${w / 2}" y="34" text-anchor="middle" font-family="Arial,sans-serif" ` +
-      `font-size="11" fill="#a855f7" font-weight="bold">${text}</text>` +
+      `<text x="${w / 2}" y="40" text-anchor="middle" font-family="Arial,sans-serif" ` +
+      `font-size="16" fill="#a855f7" font-weight="bold">${text}</text>` +
       `</svg>`
     );
     return {
       url: `data:image/svg+xml,${svg}`,
       anchor: new google.maps.Point(w / 2, 10),
-      scaledSize: new google.maps.Size(w, 40),
+      scaledSize: new google.maps.Size(w, 46),
     };
   }
 
