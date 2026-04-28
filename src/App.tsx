@@ -22,25 +22,10 @@ function App() {
     setIsPlacingPoint(true);
   }
 
-  // Step 2 — user clicked on the map: capture lat/lng, prompt for the rest
+  // Step 2 — user clicked on the map: save lat/lng immediately, no prompts
   async function handlePointPlaced(lat: number, lng: number) {
     setIsPlacingPoint(false);
-
-    const name = window.prompt("Name:");
-    if (!name) return;
-
-    const content = window.prompt("Description (optional):");
-    const pressureStr = window.prompt("Pressure (psi):");
-    const flowStr = window.prompt("Flow (gpm):");
-
-    await client.models.FireTest.create({
-      name,
-      content: content || undefined,
-      lat,
-      lng,
-      pressure: pressureStr ? parseFloat(pressureStr) : undefined,
-      flow: flowStr ? parseFloat(flowStr) : undefined,
-    });
+    await client.models.FireTest.create({ lat, lng });
   }
 
   function handleCancelPlacing() {
