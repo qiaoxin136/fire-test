@@ -78,7 +78,8 @@ function MapContent({
   const [isDirectionMode,   setIsDirectionMode]   = useState(false);
   const [directionTargetId, setDirectionTargetId] = useState<string | null>(null);
   const [hasRoute,          setHasRoute]          = useState(false);
-  const [routeInfo,         setRouteInfo]         = useState<string | null>(null);
+  type RouteInfo = { dest: string; distance: string; duration: string } | null;
+  const [routeInfo,         setRouteInfo]         = useState<RouteInfo>(null);
   type LabelMode = null | "pressure" | "flow";
   const [labelMode,         setLabelMode]         = useState<LabelMode>(null);
   const [showLabelMenu,     setShowLabelMenu]     = useState(false);
@@ -265,7 +266,9 @@ function MapContent({
 
   function clearRoute() {
     rendererRef.current?.setDirections({ routes: [] } as unknown as google.maps.DirectionsResult);
-    setHasRoute(false); setRouteInfo(null); setDirectionTargetId(null);
+    setHasRoute(false);
+    setRouteInfo(null);
+    setDirectionTargetId(null);
   }
 
   // ── GeoJSON file loader ───────────────────────────────────────────────────
@@ -351,7 +354,11 @@ function MapContent({
         rendererRef.current?.setDirections(result);
         setHasRoute(true);
         const leg = result.routes[0]?.legs[0];
-        if (leg) setRouteInfo(`${destName} · ${leg.distance?.text} · ${leg.duration?.text}`);
+        if (leg) setRouteInfo({
+          dest:     destName,
+          distance: leg.distance?.text ?? "—",
+          duration: leg.duration?.text ?? "—",
+        });
       } catch {
         alert("Could not get directions.\n\nEnsure the Directions API is enabled in Google Cloud Console.");
         setDirectionTargetId(null);
@@ -500,9 +507,28 @@ function MapContent({
           </div>
         )}
         {routeInfo && (
-          <div className="route-info-bar">
-            🗺 {routeInfo}
-            <button className="route-clear-btn" onClick={clearRoute}>✕</button>
+          <div className="route-info-card">
+            <div className="route-info-header">
+              <span className="route-info-dest">🗺 {routeInfo.dest}</span>
+              <button className="route-clear-btn" onClick={clearRoute} title="Clear route">✕</button>
+            </div>
+            <div className="route-info-stats">
+              <div className="route-stat">
+                <span className="route-stat-icon">📏</span>
+                <div>
+                  <div className="route-stat-label">Distance</div>
+                  <div className="route-stat-value">{routeInfo.distance}</div>
+                </div>
+              </div>
+              <div className="route-stat-divider" />
+              <div className="route-stat">
+                <span className="route-stat-icon">⏱</span>
+                <div>
+                  <div className="route-stat-label">Drive time</div>
+                  <div className="route-stat-value">{routeInfo.duration}</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
