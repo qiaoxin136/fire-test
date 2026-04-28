@@ -9,6 +9,7 @@ specifies that any user authenticated via an API key can "create", "read",
 const schema = a.schema({
   FireTest: a
     .model({
+      name: a.string(),
       content: a.string(),
       lat: a.float(),
       lng: a.float(),

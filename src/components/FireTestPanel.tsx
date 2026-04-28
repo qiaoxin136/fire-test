@@ -11,16 +11,18 @@ interface FireTestPanelProps {
 
 export default function FireTestPanel({ fireTests }: FireTestPanelProps) {
   async function handleCreate() {
-    const content = window.prompt("Label / description:");
-    if (!content) return;
+    const name = window.prompt("Name:");
+    if (!name) return;
 
-    const latStr = window.prompt("Latitude (e.g. 37.7749):");
-    const lngStr = window.prompt("Longitude (e.g. -122.4194):");
+    const content = window.prompt("Label / description:");
+    const latStr = window.prompt("Latitude (e.g. 35.7796):");
+    const lngStr = window.prompt("Longitude (e.g. -78.6382):");
     const pressureStr = window.prompt("Pressure (psi):");
     const flowStr = window.prompt("Flow (gpm):");
 
     await client.models.FireTest.create({
-      content,
+      name,
+      content: content ?? undefined,
       lat: latStr ? parseFloat(latStr) : undefined,
       lng: lngStr ? parseFloat(lngStr) : undefined,
       pressure: pressureStr ? parseFloat(pressureStr) : undefined,
@@ -48,7 +50,8 @@ export default function FireTestPanel({ fireTests }: FireTestPanelProps) {
         )}
         {fireTests.map((ft) => (
           <li key={ft.id} className="point-item">
-            <div className="point-title">{ft.content ?? "Unnamed"}</div>
+            <div className="point-title">{ft.name ?? ft.content ?? "Unnamed"}</div>
+            {ft.content && <div className="point-desc">{ft.content}</div>}
             <div className="point-coords">
               {ft.lat != null && ft.lng != null
                 ? `${ft.lat.toFixed(5)}, ${ft.lng.toFixed(5)}`

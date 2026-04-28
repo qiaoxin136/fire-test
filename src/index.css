@@ -99,6 +99,12 @@ html, body, #root {
   padding-right: 20px;
 }
 
+.point-desc {
+  font-size: 0.8rem;
+  color: #bbb;
+  margin-bottom: 2px;
+}
+
 .point-coords {
   font-size: 0.78rem;
   color: #aaa;

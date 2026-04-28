@@ -109,10 +109,13 @@ function MapContent({ fireTests }: FireTestMapProps) {
             >
               <div style={{ fontFamily: "sans-serif", minWidth: 160 }}>
                 <h3 style={{ margin: "0 0 8px", color: "#b71c1c" }}>
-                  🔥 {selectedPoint.content ?? "FireTest"}
+                  🔥 {selectedPoint.name ?? selectedPoint.content ?? "FireTest"}
                 </h3>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <tbody>
+                    {selectedPoint.content && (
+                      <InfoRow label="Note" value={selectedPoint.content} />
+                    )}
                     <InfoRow label="Lat" value={selectedPoint.lat?.toFixed(6)} />
                     <InfoRow label="Lng" value={selectedPoint.lng?.toFixed(6)} />
                     <InfoRow
