@@ -81,6 +81,7 @@ function MapContent({
   type LabelMode = null | "pressure" | "flow";
   const [labelMode,         setLabelMode]         = useState<LabelMode>(null);
   const [showLabelMenu,     setShowLabelMenu]     = useState(false);
+  const [showFloatingMenu,  setShowFloatingMenu]  = useState(false);
   // Street View state
   const [showSV,   setShowSV]   = useState(false);
   const [svPos,    setSvPos]    = useState<{ lat: number; lng: number } | null>(null);
@@ -299,44 +300,83 @@ function MapContent({
         style={{ position: "relative", flex: 1, height: "100%", minWidth: 0 }}
         className={isPlacingPoint ? "map-placing" : isDirectionMode ? "map-direction" : ""}
       >
-        {/* Top-right button stack */}
+        {/* ── Floating tool menu (top-right) ── */}
         {!anyModeActive && (
-          <div className="map-btn-stack">
-            <button className="locate-btn" onClick={handleLocate} disabled={locating}>
-              {locating ? "Locating…" : "📍 Locate"}
-            </button>
-            <button
-              className={`direction-btn ${hasRoute ? "direction-btn--active" : ""}`}
-              onClick={handleDirectionBtn}
-            >
-              {hasRoute ? "🗺 Clear Route" : "🧭 Direction"}
-            </button>
-            <div style={{ position: "relative" }}>
-              <button
-                className={`label-btn ${labelMode ? "label-btn--active" : ""}`}
-                onClick={() => setShowLabelMenu((v) => !v)}
-              >
-                🏷 Label{labelMode ? `: ${labelMode === "pressure" ? "Pressure" : "Flow"}` : ""}
-              </button>
-              {showLabelMenu && (
-                <div className="label-menu">
-                  <button className={`label-menu-item ${labelMode === "pressure" ? "label-menu-item--active" : ""}`}
-                    onClick={() => { setLabelMode(labelMode === "pressure" ? null : "pressure"); setShowLabelMenu(false); }}>
-                    💧 Pressure (psi)
+          <div className="fab-container">
+
+            {/* Expanded icon buttons */}
+            {showFloatingMenu && (
+              <div className="fab-items">
+
+                {/* Locate */}
+                <div className="fab-item-wrap">
+                  <span className="fab-tooltip">Locate</span>
+                  <button
+                    className={`fab-btn ${locating ? "fab-btn--busy" : ""}`}
+                    onClick={handleLocate}
+                    disabled={locating}
+                    title="Locate me"
+                  >
+                    📍
                   </button>
-                  <button className={`label-menu-item ${labelMode === "flow" ? "label-menu-item--active" : ""}`}
-                    onClick={() => { setLabelMode(labelMode === "flow" ? null : "flow"); setShowLabelMenu(false); }}>
-                    🌊 Flow (gpm)
+                </div>
+
+                {/* Direction */}
+                <div className="fab-item-wrap">
+                  <span className="fab-tooltip">{hasRoute ? "Clear Route" : "Direction"}</span>
+                  <button
+                    className={`fab-btn ${hasRoute ? "fab-btn--active-red" : ""}`}
+                    onClick={handleDirectionBtn}
+                    title="Direction"
+                  >
+                    🧭
                   </button>
-                  {labelMode && (
-                    <button className="label-menu-item label-menu-item--clear"
-                      onClick={() => { setLabelMode(null); setShowLabelMenu(false); }}>
-                      ✕ Clear Labels
-                    </button>
+                </div>
+
+                {/* Label */}
+                <div className="fab-item-wrap" style={{ position: "relative" }}>
+                  <span className="fab-tooltip">
+                    {labelMode === "pressure" ? "Pressure" : labelMode === "flow" ? "Flow" : "Label"}
+                  </span>
+                  <button
+                    className={`fab-btn ${labelMode ? "fab-btn--active-purple" : ""}`}
+                    onClick={() => setShowLabelMenu((v) => !v)}
+                    title="Label"
+                  >
+                    🏷
+                  </button>
+                  {showLabelMenu && (
+                    <div className="label-menu label-menu--fab">
+                      <button className={`label-menu-item ${labelMode === "pressure" ? "label-menu-item--active" : ""}`}
+                        onClick={() => { setLabelMode(labelMode === "pressure" ? null : "pressure"); setShowLabelMenu(false); }}>
+                        💧 Pressure (psi)
+                      </button>
+                      <button className={`label-menu-item ${labelMode === "flow" ? "label-menu-item--active" : ""}`}
+                        onClick={() => { setLabelMode(labelMode === "flow" ? null : "flow"); setShowLabelMenu(false); }}>
+                        🌊 Flow (gpm)
+                      </button>
+                      {labelMode && (
+                        <button className="label-menu-item label-menu-item--clear"
+                          onClick={() => { setLabelMode(null); setShowLabelMenu(false); }}>
+                          ✕ Clear Labels
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+
+              </div>
+            )}
+
+            {/* Toggle button */}
+            <button
+              className={`fab-toggle ${showFloatingMenu ? "fab-toggle--open" : ""}`}
+              onClick={() => { setShowFloatingMenu((v) => !v); setShowLabelMenu(false); }}
+              title="Tools"
+            >
+              {showFloatingMenu ? "✕" : "⚙"}
+            </button>
+
           </div>
         )}
 

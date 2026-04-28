@@ -460,3 +460,118 @@ html, body, #root {
   color: #b71c1c !important;
   cursor: not-allowed !important;
 }
+
+/* ── Floating Action Button (FAB) menu ──────────────── */
+.fab-container {
+  position: absolute;
+  bottom: 80px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Collapsed item stack */
+.fab-items {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* Each button + its tooltip label */
+.fab-item-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fab-tooltip {
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+}
+
+/* Icon-only action button */
+.fab-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #555;
+  background: #1e1e2e;
+  color: #fff;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  line-height: 1;
+  padding: 0;
+}
+.fab-btn:hover {
+  background: #2a2a3e;
+  border-color: #888;
+  transform: scale(1.08);
+}
+.fab-btn--busy {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.fab-btn--active-red {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+.fab-btn--active-red:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.fab-btn--active-purple {
+  background: #a855f7;
+  border-color: #a855f7;
+}
+.fab-btn--active-purple:hover {
+  background: #7e22ce;
+  border-color: #7e22ce;
+}
+
+/* Toggle (open/close) button */
+.fab-toggle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #b71c1c;
+  color: #fff;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+  transition: background 0.18s, transform 0.25s;
+  padding: 0;
+  line-height: 1;
+}
+.fab-toggle:hover { background: #7f1010; }
+.fab-toggle--open {
+  transform: rotate(90deg);
+}
+
+/* Label dropdown anchored to FAB area */
+.label-menu--fab {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  /* inherit base .label-menu styles */
+}
