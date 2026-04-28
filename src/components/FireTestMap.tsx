@@ -138,7 +138,15 @@ function MapContent({
             position={{ lat: ft.lat!, lng: ft.lng! }}
             onClick={() => !isPlacingPoint && setSelectedId(ft.id)}
           >
-            <Pin background="#e53935" borderColor="#b71c1c" glyphColor="#ffffff" />
+            <div style={{
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              background: "#22c55e",
+              border: "3px solid #15803d",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+              cursor: "pointer",
+            }} />
           </AdvancedMarker>
         ))}
 
