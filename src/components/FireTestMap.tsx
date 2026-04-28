@@ -47,20 +47,6 @@ function MapContent({
   const [showUserBalloon, setShowUserBalloon] = useState(false);
   const [locating, setLocating] = useState(false);
 
-  // Hide all POI / business / transit clutter
-  useEffect(() => {
-    if (!map) return;
-    map.setOptions({
-      styles: [
-        { featureType: "poi",          stylers: [{ visibility: "off" }] },
-        { featureType: "poi.park",     stylers: [{ visibility: "off" }] },
-        { featureType: "poi.school",   stylers: [{ visibility: "off" }] },
-        { featureType: "poi.medical",  stylers: [{ visibility: "off" }] },
-        { featureType: "poi.business", stylers: [{ visibility: "off" }] },
-        { featureType: "transit",      stylers: [{ visibility: "off" }] },
-      ],
-    });
-  }, [map]);
 
   // Cancel placing mode with Escape key
   useEffect(() => {
@@ -141,10 +127,17 @@ function MapContent({
         style={{ width: "100%", height: "100%" }}
         defaultCenter={DEFAULT_CENTER}
         defaultZoom={DEFAULT_ZOOM}
-        mapId="firetest-map"
         gestureHandling="greedy"
         disableDefaultUI={false}
         onClick={handleMapClick}
+        styles={[
+          { featureType: "poi",          stylers: [{ visibility: "off" }] },
+          { featureType: "poi.park",     stylers: [{ visibility: "off" }] },
+          { featureType: "poi.school",   stylers: [{ visibility: "off" }] },
+          { featureType: "poi.medical",  stylers: [{ visibility: "off" }] },
+          { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+          { featureType: "transit",      stylers: [{ visibility: "off" }] },
+        ]}
       >
         {/* ── FireTest markers ── */}
         {mappablePoints.map((ft) => (
