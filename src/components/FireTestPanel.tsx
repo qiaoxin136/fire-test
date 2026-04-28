@@ -9,7 +9,6 @@ type Draft = Record<FieldKey, string>;
 
 const client = generateClient<Schema>();
 
-const NUM_FIELDS: FieldKey[] = ["lat", "lng", "pressure", "flow"];
 
 function toDraft(ft: FireTest): Draft {
   return {

@@ -543,6 +543,37 @@ html, body, #root {
   background: #7e22ce;
   border-color: #7e22ce;
 }
+.fab-btn--active-teal {
+  background: #0d9488;
+  border-color: #0d9488;
+}
+.fab-btn--active-teal:hover {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+/* Small ✕ badge that clears the GeoJSON layer */
+.fab-geojson-clear {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.fab-geojson-clear:hover { background: #b91c1c; }
 
 /* Toggle (open/close) button */
 .fab-toggle {

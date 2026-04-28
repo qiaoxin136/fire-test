@@ -66,9 +66,10 @@ function MapContent({
   const apiLoaded = useApiIsLoaded();
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const svPanoRef   = useRef<google.maps.StreetViewPanorama | null>(null);
-  const svDivRef    = useRef<HTMLDivElement>(null);
+  const rendererRef   = useRef<google.maps.DirectionsRenderer | null>(null);
+  const svPanoRef     = useRef<google.maps.StreetViewPanorama | null>(null);
+  const svDivRef      = useRef<HTMLDivElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [userLocation,      setUserLocation]      = useState<{ lat: number; lng: number } | null>(null);
@@ -82,6 +83,8 @@ function MapContent({
   const [labelMode,         setLabelMode]         = useState<LabelMode>(null);
   const [showLabelMenu,     setShowLabelMenu]     = useState(false);
   const [showFloatingMenu,  setShowFloatingMenu]  = useState(false);
+  const [geoJsonLoaded,     setGeoJsonLoaded]     = useState(false);
+  const [geoJsonFileName,   setGeoJsonFileName]   = useState<string | null>(null);
   // Street View state
   const [showSV,   setShowSV]   = useState(false);
   const [svPos,    setSvPos]    = useState<{ lat: number; lng: number } | null>(null);
@@ -265,6 +268,77 @@ function MapContent({
     setHasRoute(false); setRouteInfo(null); setDirectionTargetId(null);
   }
 
+  // ── GeoJSON file loader ───────────────────────────────────────────────────
+  function handleGeoJsonFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !map) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const geojson = JSON.parse(evt.target?.result as string);
+
+        // Clear any previously loaded GeoJSON features
+        map.data.forEach((f) => map.data.remove(f));
+
+        const added = map.data.addGeoJson(geojson);
+        if (added.length === 0) {
+          alert("No valid GeoJSON features found in the file.");
+          return;
+        }
+
+        // Style all features: blue lines/polygons, amber points
+        map.data.setStyle((feature) => {
+          const geom = feature.getGeometry()?.getType();
+          if (geom === "Point" || geom === "MultiPoint") {
+            return {
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: "#f59e0b",
+                fillOpacity: 1,
+                strokeColor: "#b45309",
+                strokeWeight: 2,
+              },
+            };
+          }
+          return {
+            strokeColor:  "#1a73e8",
+            strokeWeight: 2.5,
+            strokeOpacity: 0.9,
+            fillColor:    "#1a73e8",
+            fillOpacity:  0.18,
+          };
+        });
+
+        // Zoom/pan to fit the loaded features
+        const bounds = new google.maps.LatLngBounds();
+        map.data.forEach((f) => {
+          const g = f.getGeometry();
+          if (g) {
+            g.forEachLatLng((ll) => bounds.extend(ll));
+          }
+        });
+        if (!bounds.isEmpty()) map.fitBounds(bounds);
+
+        setGeoJsonLoaded(true);
+        setGeoJsonFileName(file.name);
+      } catch {
+        alert("Failed to parse GeoJSON. Please make sure the file is valid GeoJSON.");
+      }
+      // Reset so the same file can be re-selected if needed
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function clearGeoJson() {
+    if (!map) return;
+    map.data.forEach((f) => map.data.remove(f));
+    setGeoJsonLoaded(false);
+    setGeoJsonFileName(null);
+  }
+
   function getDirections(destination: { lat: number; lng: number }, destName: string) {
     if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
     navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -300,6 +374,15 @@ function MapContent({
         style={{ position: "relative", flex: 1, height: "100%", minWidth: 0 }}
         className={isPlacingPoint ? "map-placing" : isDirectionMode ? "map-direction" : ""}
       >
+        {/* Hidden GeoJSON file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".geojson,.json"
+          style={{ display: "none" }}
+          onChange={handleGeoJsonFileChange}
+        />
+
         {/* ── Floating tool menu (top-right) ── */}
         {!anyModeActive && (
           <div className="fab-container">
@@ -362,6 +445,29 @@ function MapContent({
                         </button>
                       )}
                     </div>
+                  )}
+                </div>
+
+                {/* File (GeoJSON) */}
+                <div className="fab-item-wrap" style={{ position: "relative" }}>
+                  <span className="fab-tooltip">
+                    {geoJsonLoaded ? (geoJsonFileName ?? "GeoJSON") : "Load GeoJSON"}
+                  </span>
+                  <button
+                    className={`fab-btn ${geoJsonLoaded ? "fab-btn--active-teal" : ""}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Load GeoJSON file"
+                  >
+                    📂
+                  </button>
+                  {geoJsonLoaded && (
+                    <button
+                      className="fab-geojson-clear"
+                      onClick={clearGeoJson}
+                      title="Clear GeoJSON layer"
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
 
