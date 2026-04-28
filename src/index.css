@@ -1,65 +1,132 @@
-body {
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
   margin: 0;
-  background: linear-gradient(180deg, rgb(117, 81, 194), rgb(255, 255, 255));
-  display: flex;
+  padding: 0;
+  width: 100%;
+  height: 100%;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  height: 100vh;
-  width: 100vw;
-  justify-content: center;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+/* ── Side Panel ─────────────────────────────────────── */
+.panel {
+  width: 300px;
+  min-width: 260px;
+  background: #1e1e2e;
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.4);
+  z-index: 10;
+}
+
+.panel-header {
+  padding: 16px;
+  background: #b71c1c;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
-main {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #fff;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.btn-add {
+  background: #fff;
+  color: #b71c1c;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.25s;
-  color: white;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: background 0.2s;
 }
 
-ul {
-  padding-inline-start: 0;
-  margin-block-start: 0;
-  margin-block-end: 0;
-  list-style-type: none;
+.btn-add:hover {
+  background: #ffcdd2;
+}
+
+/* ── Point List ─────────────────────────────────────── */
+.point-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 8px 0;
-  border: 1px solid black;
-  gap: 1px;
-  background-color: black;
+  gap: 6px;
+}
+
+.empty {
+  color: #888;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.point-item {
+  background: #2a2a3e;
   border-radius: 8px;
-  overflow: auto;
+  padding: 10px 12px;
+  position: relative;
+  border-left: 3px solid #e53935;
 }
 
-li {
-  background-color: white;
-  padding: 8px;
+.point-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+  padding-right: 20px;
 }
 
-li:hover {
-  background: #dadbf9;
+.point-coords {
+  font-size: 0.78rem;
+  color: #aaa;
+  margin-bottom: 4px;
 }
 
-a {
-  font-weight: 800;
-  text-decoration: none;
+.point-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.btn-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.btn-delete:hover {
+  color: #e53935;
+  background: rgba(229, 57, 53, 0.1);
 }
