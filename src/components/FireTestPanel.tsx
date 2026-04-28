@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
@@ -42,17 +42,26 @@ export default function FireTestPanel({
   const [editingField, setEditingField] = useState<FieldKey | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  // Track what was last saved so isDirty clears immediately after Apply
+  const savedDraftRef = useRef<Draft | null>(null);
 
   // Reset draft whenever selected point changes
   useEffect(() => {
-    setDraft(selectedPoint ? toDraft(selectedPoint) : null);
+    const d = selectedPoint ? toDraft(selectedPoint) : null;
+    setDraft(d);
+    savedDraftRef.current = d;
     setEditingField(null);
   }, [selectedId]);
 
+  // Also sync savedDraft when observeQuery updates the point after save
+  useEffect(() => {
+    if (selectedPoint) savedDraftRef.current = toDraft(selectedPoint);
+  }, [selectedPoint]);
+
   const isDirty =
     draft !== null &&
-    selectedPoint !== null &&
-    JSON.stringify(draft) !== JSON.stringify(toDraft(selectedPoint));
+    savedDraftRef.current !== null &&
+    JSON.stringify(draft) !== JSON.stringify(savedDraftRef.current);
 
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this point?")) return;
@@ -72,20 +81,21 @@ export default function FireTestPanel({
   async function handleApply() {
     if (!selectedPoint || !draft) return;
     setSaving(true);
-
-    const update: Record<string, string | number | null> = { id: selectedPoint.id };
-    for (const key of Object.keys(draft) as FieldKey[]) {
-      const raw = draft[key];
-      if (NUM_FIELDS.includes(key)) {
-        update[key] = raw === "" ? null : parseFloat(raw);
-      } else {
-        update[key] = raw === "" ? null : raw;
-      }
-    }
-
-    await client.models.FireTest.update(update as Parameters<typeof client.models.FireTest.update>[0]);
-    setSaving(false);
     setEditingField(null);
+
+    await client.models.FireTest.update({
+      id: selectedPoint.id,
+      name:     draft.name     !== "" ? draft.name     : null,
+      content:  draft.content  !== "" ? draft.content  : null,
+      lat:      draft.lat      !== "" ? parseFloat(draft.lat)      : null,
+      lng:      draft.lng      !== "" ? parseFloat(draft.lng)      : null,
+      pressure: draft.pressure !== "" ? parseFloat(draft.pressure) : null,
+      flow:     draft.flow     !== "" ? parseFloat(draft.flow)     : null,
+    });
+
+    // Snapshot what we just saved so isDirty clears immediately
+    savedDraftRef.current = { ...draft };
+    setSaving(false);
   }
 
   return (
