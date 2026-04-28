@@ -16,9 +16,9 @@ interface FireTestMapProps {
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
-// Default center: continental US
-const DEFAULT_CENTER = { lat: 39.5, lng: -98.35 };
-const DEFAULT_ZOOM = 4;
+// Default center: Raleigh, NC
+const DEFAULT_CENTER = { lat: 35.7796, lng: -78.6382 };
+const DEFAULT_ZOOM = 15;
 
 export default function FireTestMap({ fireTests }: FireTestMapProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
