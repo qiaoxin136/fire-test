@@ -210,7 +210,7 @@ export default function FireTestPanel({
             ))}
           </div>
 
-          {/* ── Apply button ── */}
+          {/* ── Apply / Delete buttons ── */}
           <div className="attr-footer">
             <button
               className="btn-apply"
@@ -218,6 +218,14 @@ export default function FireTestPanel({
               disabled={saving || !isDirty}
             >
               {saving ? "Saving…" : "Apply"}
+            </button>
+            <button
+              className="btn-delete-point"
+              onClick={() => handleDelete(selectedPoint.id)}
+              disabled={saving}
+              title="Delete this point"
+            >
+              🗑 Delete
             </button>
             {isDirty && <span className="unsaved-hint">Unsaved changes</span>}
           </div>
