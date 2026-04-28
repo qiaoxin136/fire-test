@@ -1,11 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
 type FireTest = Schema["FireTest"]["type"];
 type FieldKey = "name" | "content" | "lat" | "lng" | "pressure" | "flow";
 
+type Draft = Record<FieldKey, string>;
+
 const client = generateClient<Schema>();
+
+const NUM_FIELDS: FieldKey[] = ["lat", "lng", "pressure", "flow"];
+
+function toDraft(ft: FireTest): Draft {
+  return {
+    name:     ft.name     != null ? String(ft.name)     : "",
+    content:  ft.content  != null ? String(ft.content)  : "",
+    lat:      ft.lat      != null ? String(ft.lat)      : "",
+    lng:      ft.lng      != null ? String(ft.lng)      : "",
+    pressure: ft.pressure != null ? String(ft.pressure) : "",
+    flow:     ft.flow     != null ? String(ft.flow)     : "",
+  };
+}
 
 interface FireTestPanelProps {
   fireTests: FireTest[];
@@ -22,10 +37,22 @@ export default function FireTestPanel({
   selectedId,
   onSelectId,
 }: FireTestPanelProps) {
-  const [editingField, setEditingField] = useState<FieldKey | null>(null);
-  const [editValue, setEditValue] = useState("");
-
   const selectedPoint = fireTests.find((ft) => ft.id === selectedId) ?? null;
+
+  const [editingField, setEditingField] = useState<FieldKey | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Reset draft whenever selected point changes
+  useEffect(() => {
+    setDraft(selectedPoint ? toDraft(selectedPoint) : null);
+    setEditingField(null);
+  }, [selectedId]);
+
+  const isDirty =
+    draft !== null &&
+    selectedPoint !== null &&
+    JSON.stringify(draft) !== JSON.stringify(toDraft(selectedPoint));
 
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this point?")) return;
@@ -33,29 +60,32 @@ export default function FireTestPanel({
     await client.models.FireTest.delete({ id });
   }
 
-  function startEdit(field: FieldKey, current: string | number | null | undefined) {
-    setEditingField(field);
-    setEditValue(current != null ? String(current) : "");
-  }
-
-  async function commitEdit() {
-    if (!selectedPoint || editingField === null) return;
-    setEditingField(null);
-
-    const numFields: FieldKey[] = ["lat", "lng", "pressure", "flow"];
-    const value = numFields.includes(editingField)
-      ? editValue === "" ? null : parseFloat(editValue)
-      : editValue === "" ? null : editValue;
-
-    await client.models.FireTest.update({
-      id: selectedPoint.id,
-      [editingField]: value,
-    });
+  function handleFieldChange(field: FieldKey, value: string) {
+    setDraft((prev) => prev ? { ...prev, [field]: value } : prev);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") commitEdit();
     if (e.key === "Escape") setEditingField(null);
+    if (e.key === "Tab")    setEditingField(null);
+  }
+
+  async function handleApply() {
+    if (!selectedPoint || !draft) return;
+    setSaving(true);
+
+    const update: Record<string, string | number | null> = { id: selectedPoint.id };
+    for (const key of Object.keys(draft) as FieldKey[]) {
+      const raw = draft[key];
+      if (NUM_FIELDS.includes(key)) {
+        update[key] = raw === "" ? null : parseFloat(raw);
+      } else {
+        update[key] = raw === "" ? null : raw;
+      }
+    }
+
+    await client.models.FireTest.update(update as Parameters<typeof client.models.FireTest.update>[0]);
+    setSaving(false);
+    setEditingField(null);
   }
 
   return (
@@ -98,15 +128,13 @@ export default function FireTestPanel({
               className="btn-delete"
               onClick={(e) => { e.stopPropagation(); handleDelete(ft.id); }}
               title="Delete"
-            >
-              ✕
-            </button>
+            >✕</button>
           </li>
         ))}
       </ul>
 
       {/* ── Attribute editor ── */}
-      {selectedPoint && (
+      {selectedPoint && draft && (
         <div className="attr-panel">
           <div className="attr-header">
             <span>📋 Attributes</span>
@@ -114,126 +142,54 @@ export default function FireTestPanel({
           </div>
 
           <div className="attr-list">
-            <AttrRow
-              label="Name"
-              field="name"
-              value={selectedPoint.name}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-            />
-            <AttrRow
-              label="Description"
-              field="content"
-              value={selectedPoint.content}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-            />
-            <AttrRow
-              label="Lat"
-              field="lat"
-              value={selectedPoint.lat}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-              type="number"
-            />
-            <AttrRow
-              label="Lng"
-              field="lng"
-              value={selectedPoint.lng}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-              type="number"
-            />
-            <AttrRow
-              label="Pressure (psi)"
-              field="pressure"
-              value={selectedPoint.pressure}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-              type="number"
-            />
-            <AttrRow
-              label="Flow (gpm)"
-              field="flow"
-              value={selectedPoint.flow}
-              editingField={editingField}
-              editValue={editValue}
-              onEdit={startEdit}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onKeyDown={handleKeyDown}
-              type="number"
-            />
+            {(
+              [
+                { label: "Name",           field: "name"     as FieldKey, type: "text"   },
+                { label: "Description",    field: "content"  as FieldKey, type: "text"   },
+                { label: "Lat",            field: "lat"      as FieldKey, type: "number" },
+                { label: "Lng",            field: "lng"      as FieldKey, type: "number" },
+                { label: "Pressure (psi)", field: "pressure" as FieldKey, type: "number" },
+                { label: "Flow (gpm)",     field: "flow"     as FieldKey, type: "number" },
+              ] as { label: string; field: FieldKey; type: "text" | "number" }[]
+            ).map(({ label, field, type }) => (
+              <div className="attr-row" key={field}>
+                <div className="attr-label">{label}</div>
+                {editingField === field ? (
+                  <input
+                    className="attr-input"
+                    type={type}
+                    value={draft[field]}
+                    autoFocus
+                    onChange={(e) => handleFieldChange(field, e.target.value)}
+                    onBlur={() => setEditingField(null)}
+                    onKeyDown={handleKeyDown}
+                  />
+                ) : (
+                  <div
+                    className={`attr-value ${draft[field] !== (selectedPoint[field] != null ? String(selectedPoint[field]) : "") ? "attr-value--dirty" : ""}`}
+                    onClick={() => setEditingField(field)}
+                    title="Click to edit"
+                  >
+                    {draft[field] !== "" ? draft[field] : "—"}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* ── Apply button ── */}
+          <div className="attr-footer">
+            <button
+              className="btn-apply"
+              onClick={handleApply}
+              disabled={saving || !isDirty}
+            >
+              {saving ? "Saving…" : "Apply"}
+            </button>
+            {isDirty && <span className="unsaved-hint">Unsaved changes</span>}
           </div>
         </div>
       )}
     </aside>
-  );
-}
-
-// ── Single editable row ───────────────────────────────────────────────────────
-interface AttrRowProps {
-  label: string;
-  field: FieldKey;
-  value: string | number | null | undefined;
-  editingField: FieldKey | null;
-  editValue: string;
-  onEdit: (field: FieldKey, current: string | number | null | undefined) => void;
-  onChange: (val: string) => void;
-  onCommit: () => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
-  type?: "text" | "number";
-}
-
-function AttrRow({
-  label, field, value, editingField, editValue,
-  onEdit, onChange, onCommit, onKeyDown, type = "text",
-}: AttrRowProps) {
-  const isEditing = editingField === field;
-  const display = value != null ? String(value) : "—";
-
-  return (
-    <div className="attr-row">
-      <div className="attr-label">{label}</div>
-      {isEditing ? (
-        <input
-          className="attr-input"
-          type={type}
-          value={editValue}
-          autoFocus
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onCommit}
-          onKeyDown={onKeyDown}
-        />
-      ) : (
-        <div
-          className="attr-value"
-          onClick={() => onEdit(field, value)}
-          title="Click to edit"
-        >
-          {display}
-        </div>
-      )}
-    </div>
   );
 }

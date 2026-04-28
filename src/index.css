@@ -221,6 +221,43 @@ html, body, #root {
   outline: none;
 }
 
+/* Highlight fields with unsaved changes */
+.attr-value--dirty {
+  color: #fbbf24;
+}
+
+/* ── Attribute footer + Apply button ────────────────── */
+.attr-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 14px;
+}
+
+.btn-apply {
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 24px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-apply:hover:not(:disabled) {
+  background: #16a34a;
+}
+.btn-apply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.unsaved-hint {
+  font-size: 0.75rem;
+  color: #fbbf24;
+}
+
 /* ── Locate button (overlaid on map) ────────────────── */
 .locate-btn {
   position: absolute;
