@@ -81,6 +81,34 @@ export default function FireTestPanel({
     if (e.key === "Tab")    setEditingField(null);
   }
 
+  function handleExport() {
+    const features = fireTests
+      .filter((ft) => ft.lat != null && ft.lng != null)
+      .map((ft) => ({
+        type: "Feature" as const,
+        geometry: {
+          type: "Point" as const,
+          coordinates: [ft.lng!, ft.lat!],
+        },
+        properties: {
+          id:          ft.id,
+          name:        ft.name        ?? null,
+          description: ft.content     ?? null,
+          pressure:    ft.pressure    ?? null,
+          flow:        ft.flow        ?? null,
+        },
+      }));
+
+    const geojson = { type: "FeatureCollection" as const, features };
+    const blob    = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json" });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement("a");
+    a.href        = url;
+    a.download    = `fire-tests-${new Date().toISOString().slice(0, 10)}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleApply() {
     if (!selectedPoint || !draft) return;
     setSaving(true);
@@ -133,6 +161,21 @@ export default function FireTestPanel({
       <div className="user-bar">
         <span className="user-email" title={userEmail}>👤 {userEmail}</span>
         <button className="btn-signout" onClick={onSignOut}>Sign out</button>
+      </div>
+
+      {/* ── Toolbar ── */}
+      <div className="panel-toolbar">
+        <span className="panel-toolbar-count">
+          {fireTests.length} point{fireTests.length !== 1 ? "s" : ""}
+        </span>
+        <button
+          className="btn-export"
+          onClick={handleExport}
+          disabled={fireTests.filter((ft) => ft.lat != null && ft.lng != null).length === 0}
+          title="Export all points as GeoJSON"
+        >
+          ⬇ Export GeoJSON
+        </button>
       </div>
 
       {/* ── Point list ── */}
